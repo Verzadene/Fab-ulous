@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FABulous – Register</title>
+  <link rel="stylesheet" href="Register.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="topnav">
+    <div class="logo-placeholder">F★</div>
+  </nav>
+
+  <!-- Page Controls -->
+  <div class="page-controls">
+    <a href="Login.html" class="ctrl-btn return-btn">&#8592; Return</a>
+  </div>
+
+  <!-- Main Card -->
+  <main class="card-container">
+
+    <!-- Left Panel -->
+    <div class="left-panel">
+      <div class="brand-logo-placeholder">F★</div>
+      <h1 class="brand-heading">Explore Fablab<br/>with Fab-ulous</h1>
+      <p class="brand-desc">
+        As technology evolves, sharing projects in both software and hardware is important.
+        FABulous provides a community to share your projects in a single platform
+      </p>
+      <div class="carousel-dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+      <h2 class="panel-title">Register</h2>
+
+      <!-- First / Last Name row -->
+      <div class="name-row">
+        <div class="input-group half">
+          <input type="text" id="firstName" class="input-field" placeholder="First Name" autocomplete="given-name"/>
+        </div>
+        <div class="input-group half">
+          <input type="text" id="lastName" class="input-field" placeholder="Last Name" autocomplete="family-name"/>
+        </div>
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="username" class="input-field" placeholder="Username" autocomplete="username"/>
+      </div>
+
+      <div class="input-group">
+        <input type="email" id="email" class="input-field" placeholder="Email" autocomplete="email"/>
+      </div>
+
+      <div class="input-group">
+        <input type="password" id="password" class="input-field" placeholder="Password" autocomplete="new-password"/>
+      </div>
+
+      <div class="input-group">
+        <input type="password" id="confirmPassword" class="input-field" placeholder="Confirm Password" autocomplete="new-password"/>
+      </div>
+
+      <button class="btn-primary">Sign up</button>
+
+      <div class="bottom-links">
+        <span class="bottom-text">Already have Account? <a href="Login.html" class="link-btn">Log in Now!</a></span>
+      </div>
+    </div>
+
+  </main>
+
+</body>
+</html>
