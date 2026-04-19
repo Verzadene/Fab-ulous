@@ -15,22 +15,28 @@ collaborate with others, and access Fab Lab services — all in one platform.
 
 ## 📁 Project Structure
 ```
-Fab-ulous/
-├── css/
-│   ├── Landing.css
-│   ├── Login.css
-│   └── Register.css
-├── html/
-│   ├── Landing.html
-│   ├── Login.html
-│   ├── Post.html
-│   └── Register.html
-├── js/
-│   └── Register.js
-├── php/
-│   └── Register.php
-└── Documentation/
-    └── FABulous_ProjectDocs_v0.2.0.docx
+FAB-ULOUS/
+├── documentation/
+│   └── FABulous_ProjectDocs_v0.2.0.docx
+├── images/
+│   ├── source/               # Raw/Unprocessed assets
+│   ├── Big Logo.png
+│   └── Top Left Logo.png
+├── landing/
+│   ├── landing.css
+│   └── landing.html
+├── login/
+│   ├── login.css
+│   └── login.html
+├── post/
+│   ├── post.css
+│   └── post.html
+├── register/
+│   ├── register.css
+│   ├── register.html
+│   ├── register.js
+│   └── register.php
+└── README.md
 ```
 
 ---
