@@ -1,0 +1,288 @@
+/* ============================================
+   POST.CSS — FABulous
+   User Dashboard / News Feed
+   ============================================ */
+
+/* ---------- CSS Variables ---------- */
+:root {
+  --bg:            #25342B;
+  --bg-card:       #FFFFFF;
+  --bg-notif:      #FFFFFF;
+  --green-accent:  #477C5A;
+  --green-active:  #77CC81;
+  --text-white:    #FFFFFF;
+  --text-dark:     #1A1A1A;
+  --text-muted:    rgba(255, 255, 255, 0.60);
+  --sidebar-width: 200px;
+  --notif-width:   240px;
+  --nav-height:    72px;
+  --radius-card:   18px;
+  --radius-pill:   999px;
+  --font:          'Roboto Condensed', sans-serif;
+}
+
+/* ---------- Reset & Base ---------- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background-color: var(--bg) !important;
+  font-family: var(--font) !important;
+  color: var(--text-white) !important;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   TOP NAV
+   ============================================ */
+.topnav {
+  width: 100%;
+  height: var(--nav-height);
+  background-color: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  border-bottom: 2px solid var(--green-accent);
+  box-shadow: 0 3px 0 0 var(--green-accent);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Logo placeholder */
+.nav-logo-placeholder {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 2px dashed rgba(255,255,255,0.30);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-white);
+  flex-shrink: 0;
+}
+
+/* Nav links cluster */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-item {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-white);
+  text-decoration: none;
+  padding: 8px 20px;
+  border-radius: var(--radius-pill);
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+.nav-item:hover {
+  background: rgba(255,255,255,0.10);
+  color: var(--text-white);
+  transform: translateY(-1px);
+}
+.nav-item.active {
+  background: var(--green-active);
+  color: var(--text-dark) !important;
+  font-weight: 700;
+}
+.nav-item.active:hover {
+  background: #5db568;
+  color: var(--text-dark) !important;
+}
+
+/* Hamburger */
+.hamburger-btn {
+  width: 36px;
+  height: 36px;
+  background: transparent !important;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+.hamburger-btn:hover { opacity: 0.65; }
+.hamburger-btn span {
+  display: block;
+  width: 26px;
+  height: 2.5px;
+  background: var(--text-white);
+  border-radius: 2px;
+}
+
+/* ============================================
+   PAGE BODY — 3 column layout
+   ============================================ */
+.page-body {
+  display: flex;
+  width: 100%;
+  min-height: calc(100vh - var(--nav-height));
+  padding: 28px 32px;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* ============================================
+   LEFT SIDEBAR
+   ============================================ */
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Profile */
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatar-placeholder {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--text-white);
+  border: 3px solid rgba(255,255,255,0.6);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.avatar-icon {
+  width: 90px;
+  height: 90px;
+}
+
+.profile-username {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-white);
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.profile-email {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Sidebar Nav */
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.sidebar-link {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-white);
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-align: center;
+  transition: background 0.2s, transform 0.15s;
+  border: 2px solid transparent;
+}
+.sidebar-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-white);
+  transform: translateX(3px);
+}
+.sidebar-link.active {
+  background: var(--text-white);
+  color: var(--text-dark) !important;
+  border-color: var(--text-white);
+}
+.sidebar-link.active:hover {
+  background: rgba(255,255,255,0.90);
+  color: var(--text-dark) !important;
+}
+
+/* ============================================
+   MAIN FEED
+   ============================================ */
+.feed {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Post Card */
+.post-card {
+  width: 100%;
+  min-height: 460px;
+  background: var(--bg-card);
+  border-radius: var(--radius-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.post-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 32px rgba(0,0,0,0.28);
+}
+
+.post-label {
+  font-family: var(--font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-dark);
+  letter-spacing: 1px;
+  opacity: 0.35;
+}
+
+/* ============================================
+   RIGHT NOTIF PANEL
+   ============================================ */
+.notif-panel {
+  width: var(--notif-width);
+  flex-shrink: 0;
+}
+
+.notif-card {
+  width: 100%;
+  min-height: 460px;
+  background: var(--bg-notif);
+  border-radius: var(--radius-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  border-top: 4px solid var(--green-active);
+}
+
+.notif-label {
+  font-family: var(--font);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-dark);
+  letter-spacing: 1px;
+  opacity: 0.35;
+}
