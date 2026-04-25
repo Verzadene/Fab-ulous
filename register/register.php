@@ -1,32 +1,62 @@
 <?php
-    $host = "LAPTOP-R04OAJ46\SQLEXPRESS";
-    $connection = [
-        "Database" => "FAB_ULOUS",
-        "Uid" => "",
-        "PWD" => ""
-    ];
-    $conn = sqlsrv_connect($host, $connection);
+// ── MySQL Connection ───────────────────────────────────────
+// Change "root" and "" to your MySQL username and password if different
+$conn = new mysqli("localhost", "root", "", "fab_ulous");
 
-    if ($conn === false) {
-        die(print_r(sqlsrv_errors(),true));
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// ── Server-side password validation ───────────────────────
+$password = $_POST['password'];
+
+if (strlen($password) < 16) {
+    die("Password must be at least 16 characters.");
+}
+if (preg_match_all('/[^a-zA-Z0-9]/', $password) < 2) {
+    die("Password must contain at least 2 special characters.");
+}
+if (preg_match_all('/[0-9]/', $password) < 2) {
+    die("Password must contain at least 2 numbers.");
+}
+
+$firstName = $_POST['firstName'];
+$lastName  = $_POST['lastName'];
+$username  = $_POST['username'];
+$email     = $_POST['email'];
+
+// ── Duplicate check: same email OR same username ───────────
+// Prevents creating a duplicate account whether the user
+// previously signed up manually or via Google OAuth.
+$checkStmt = $conn->prepare("SELECT * FROM accounts WHERE email = ? OR username = ?");
+$checkStmt->bind_param("ss", $email, $username);
+$checkStmt->execute();
+$result   = $checkStmt->get_result();
+$existing = $result->fetch_assoc();
+$checkStmt->close();
+
+if ($existing) {
+    if ($existing['email'] === $email) {
+        header("Location: ../register/register.html?error=email_taken");
+    } else {
+        header("Location: ../register/register.html?error=username_taken");
     }
+    exit;
+}
 
-    $firstName = $_POST['firstName'];
-    $lastName = $_POST['lastName'];
-    $username = $_POST['username'];
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+// ── Insert new account ─────────────────────────────────────
+$stmt = $conn->prepare(
+    "INSERT INTO accounts (first_name, last_name, username, email, password)
+     VALUES (?, ?, ?, ?, ?)"
+);
+$stmt->bind_param("sssss", $firstName, $lastName, $username, $email, $password);
 
-    $sql = "INSERT INTO ACCOUNTS(FIRST_NAME,LAST_NAME,USERNAME,EMAIL,PASSWORD)
-    VALUES ('$firstName','$lastName', '$username','$email', '$password')";
-
-    $result = sqlsrv_query($conn,$sql);
-
-    if ($result){
-        header("Location: html/Post.html");
-        exit();
-    }
-    else{
-        die(print_r(sqlsrv_errors(),true));
-    }
+if ($stmt->execute()) {
+    $stmt->close();
+    $conn->close();
+    header("Location: ../post/post.html");
+    exit;
+} else {
+    die("Registration failed: " . $stmt->error);
+}
 ?>
