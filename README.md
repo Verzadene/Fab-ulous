@@ -1,4 +1,9 @@
-# FABulous
+Here's your updated README.md:
+
+---
+
+```markdown
+# FABulous 🛠️⭐
 
 A community platform for sharing software and hardware projects in a single unified space.
 FABulous bridges the gap between digital and physical creation — from code to builds.
@@ -14,12 +19,15 @@ collaborate with others, and access Fab Lab services — all in one platform.
 ---
 
 ## 📁 Project Structure
+
 ```
 FAB-ULOUS/
+├── admin/
+├── database/
 ├── documentation/
 │   └── FABulous_ProjectDocs_v0.2.0.docx
 ├── images/
-│   ├── source/               # Raw/Unprocessed assets
+│   ├── source/
 │   ├── Big Logo.png
 │   └── Top Left Logo.png
 ├── landing/
@@ -27,10 +35,13 @@ FAB-ULOUS/
 │   └── landing.html
 ├── login/
 │   ├── login.css
-│   └── login.html
+│   └── login.php
+├── oauth/
+│   └── oauth2callback.php
 ├── post/
 │   ├── post.css
 │   └── post.html
+├── profile/
 ├── register/
 │   ├── register.css
 │   ├── register.html
@@ -52,17 +63,27 @@ FAB-ULOUS/
 - Sign Up routes to Register page
 
 ### 🔐 Authentication
-- User registration with full client-side validation via `Register.js`
+- User registration with full client-side validation via `register.js`
   - Minimum 16 character password
   - Requires at least 2 special characters and 2 numbers
   - Confirm password matching check
-- User login with show/hide password toggle
+- Server-side duplicate check — blocks same email or username from registering twice
+- User login with show/hide password toggle — matches by username OR email
 - Return button on Login and Register routes back to Landing page
-- Continue with Google button (UI only — not yet wired)
+- Continue with Google (OAuth 2.0) on both Login and Register pages
+- Google OAuth prevents duplicate accounts — if email already exists, logs in instead of inserting
 - Forgot Password link (UI only — not yet wired)
 
+### 📋 Post Dashboard
+- Three-column layout: sidebar, news feed, notifications panel
+- Left sidebar with avatar placeholder, username, email, and nav links
+- News Feed, Messages, Uploads, Settings sidebar navigation
+- Post card placeholders in the main feed
+- Notification panel on the right
+- Top nav with Home (active), Projects, Commissions, History, and hamburger menu
+
 ### 🎨 UI & Design
-- Consistent color palette across all pages:
+Consistent color palette across all pages:
 
 | Color | Hex | Used For |
 |---|---|---|
@@ -78,39 +99,52 @@ FAB-ULOUS/
 - Bootstrap 5.3.3 integrated — loaded before custom CSS to prevent conflicts
 - Hover effects: lift + box-shadow on all buttons
 - Active press effect: scale on click
+- Real logo images applied on Login and Post pages
 
 ### 🗄️ Database
-- Microsoft SQL Server (SSMS / SQLEXPRESS) integration
-- `FAB_ULOUS` database with `ACCOUNTS` table
-- PHP backend processes registration and inserts user data
-- Windows Authentication connection
-- Server-side validation as a security layer alongside client-side JS
+- MySQL via XAMPP (phpMyAdmin)
+- `fab_ulous` database with `accounts` table
+- PHP `mysqli` with prepared statements and `bind_param` for all queries
+- Duplicate check on both `email` and `username` during registration
+- Google OAuth stores `google_id` in accounts table
+- Server-side password validation as a security layer alongside client-side JS
+
+### 🔑 Google OAuth
+- OAuth 2.0 flow via `oauth/oauth2callback.php`
+- Exchanges authorization code for access token
+- Fetches Google user profile (name, email, Google ID)
+- Checks for existing account by email before inserting
+- Auto-generates username from Google display name
+- Sets PHP session on successful login
+- Available on both Login and Register pages
 
 ---
 
 ## 🚧 Upcoming Features
 
-### 📋 Post Dashboard
-A social media-style feed where users can:
-- Create and share software and hardware project posts
-- View, like, and comment on other users' projects
-- Filter posts by category (software, hardware, 3D printing, etc.)
-- Follow other makers and build a personal feed
+### 📝 Post Creation
+- Allow users to create and publish posts to the news feed
+- Support for images, descriptions, and project tags
+- Like and comment functionality
+
+### 💬 Messages
+- Direct messaging between users
+
+### 👤 User Profiles
+- Profile pages with project portfolios and bio
 
 ### 💳 Commission & Transaction System
 A built-in marketplace for Fab Lab services:
 - Request 3D printing commissions directly through the platform
 - Track order status from request to completion
-- Secure transaction handling between clients and Fab Lab operators
 - File upload support for 3D model submissions (.stl, .obj)
+- Pricing calculator based on material and print time
 
 ### 🔧 And More Coming Soon...
-- User profile pages with project portfolios
-- Admin dashboard for managing users and commissions
-- Google OAuth full integration
-- Real-time notifications system
-- Search functionality across all posts and users
-- Messaging between users
+- Admin dashboard for managing users, posts, and commissions
+- Forgot Password flow
+- Real-time notifications
+- Search functionality across posts and users
 - Mobile responsive design
 
 ---
@@ -123,8 +157,9 @@ A built-in marketplace for Fab Lab services:
 | UI Framework | Bootstrap 5.3.3 |
 | Font | Roboto Condensed (Google Fonts) |
 | Backend | PHP 8.2 |
-| Database | Microsoft SQL Server (SSMS / SQLEXPRESS) |
-| Local Server | XAMPP (Apache) |
+| Database | MySQL 8 (via phpMyAdmin) |
+| Local Server | XAMPP (Apache + MySQL) |
+| Authentication | Google OAuth 2.0 |
 | Version Control | Git & GitHub |
 | Design | Figma |
 | Code Editor | Visual Studio Code |
@@ -134,25 +169,42 @@ A built-in marketplace for Fab Lab services:
 ## 🚀 Getting Started
 
 ### Prerequisites
-- XAMPP installed with Apache running
-- Microsoft SQL Server (SQLEXPRESS) running
-- PHP sqlsrv drivers installed and enabled in `php.ini`
+- XAMPP installed with **Apache** and **MySQL** running
+- phpMyAdmin accessible at `http://localhost/phpmyadmin`
+
+### Database Setup
+1. Open phpMyAdmin
+2. Create a new database called `fab_ulous`
+3. Run the following SQL:
+
+```sql
+CREATE TABLE accounts (
+  id         INT AUTO_INCREMENT PRIMARY KEY,
+  first_name VARCHAR(100) NOT NULL,
+  last_name  VARCHAR(100) NOT NULL,
+  username   VARCHAR(100) NOT NULL UNIQUE,
+  email      VARCHAR(150) NOT NULL UNIQUE,
+  password   VARCHAR(255) NOT NULL,
+  google_id  VARCHAR(100) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
 ### Setup
 1. Clone the repository
-```bash
+   ```bash
    git clone https://github.com/Verzadene/Fab-ulous.git
-```
+   ```
 2. Move the folder to your XAMPP htdocs directory
-```
+   ```
    C:\xampp\htdocs\Fab-ulous
-```
-3. Start Apache in XAMPP Control Panel
+   ```
+3. Start **Apache** and **MySQL** in XAMPP Control Panel
 
 4. Open your browser and go to
-```
-   http://localhost/Fab-ulous/html/Landing.html
-```
+   ```
+   http://localhost/Fab-ulous/landing/landing.html
+   ```
 
 > ⚠️ Do NOT open HTML files directly in the browser — PHP will not run without Apache.
 
@@ -195,8 +247,23 @@ Then open a Pull Request on GitHub to merge into `master`.
 
 Full project documentation including design specs, file structure, Git guide, and upcoming features:
 
-`Documentation/FABulous_ProjectDocs_v0.2.0.docx`
+`documentation/FABulous_ProjectDocs_v0.2.0.docx`
 
 ---
 
-*FABulous — The Future of Fablab is Here.*
+*FABulous — The Future of Fablab is Here.* ⭐
+```
+
+---
+
+### How to update it on GitHub:
+
+1. Go to `https://github.com/Verzadene/Fab-ulous`
+2. Click `README.md`
+3. Click the **pencil icon** to edit
+4. Select all and paste the content above
+5. Click **Commit changes**
+6. Then sync locally:
+```bash
+git pull origin master
+```
