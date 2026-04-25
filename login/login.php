@@ -75,7 +75,7 @@ $conn->close();
   <main class="card-container">
 
     <div class="left-panel">
-      <div class="brand-logo-placeholder">F★</div>
+      <img src="../images/Big Logo.png" alt="FABulous Logo" class="brand-logo-img" />
       <h1 class="brand-heading">Explore Fablab<br/>with Fab-ulous</h1>
       <p class="brand-desc">
         As technology evolves, sharing projects in both software and hardware is important.
