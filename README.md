@@ -266,4 +266,3 @@ Full project documentation including design specs, file structure, Git guide, an
 6. Then sync locally:
 ```bash
 git pull origin master
-```
