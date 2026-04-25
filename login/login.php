@@ -1,15 +1,12 @@
 <?php
 session_start();
 
-// ── MySQL Connection ───────────────────────────────────────
 $conn = new mysqli("localhost", "root", "", "fab_ulous");
-
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// ── Google OAuth redirect ──────────────────────────────────
-// Clicking "Continue with Google" hits ?google=1 on this file
+// Google OAuth redirect
 if (isset($_GET['google'])) {
     $client_id    = '313306839766-5be832449af0f4lf0autei7oogm2ra5f.apps.googleusercontent.com';
     $redirect_uri = 'http://localhost/Fab-ulous/oauth/oauth2callback.php';
@@ -19,36 +16,40 @@ if (isset($_GET['google'])) {
     exit;
 }
 
-// ── Direct login form handler ──────────────────────────────
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $usernameOrEmail = $_POST['username'];
+    $usernameOrEmail = trim($_POST['username']);
     $password        = $_POST['password'];
 
-    // Match by username OR email
-    $stmt = $conn->prepare(
-        "SELECT * FROM accounts WHERE username = ? OR email = ?"
-    );
+    $stmt = $conn->prepare("SELECT * FROM accounts WHERE username = ? OR email = ?");
     $stmt->bind_param("ss", $usernameOrEmail, $usernameOrEmail);
     $stmt->execute();
-    $result = $stmt->get_result();
-    $user   = $result->fetch_assoc();
+    $user = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    if ($user && $user['password'] === $password) {
-        // Store session and redirect to dashboard
-        $_SESSION['user'] = [
-            'username' => $user['username'],
-            'email'    => $user['email'],
-            'name'     => $user['first_name'] . ' ' . $user['last_name']
-        ];
-        $conn->close();
-        header('Location: ../post/post.html');
-        exit;
+    if ($user && !empty($user['password']) && password_verify($password, $user['password'])) {
+        if ($user['banned']) {
+            $error = 'Your account has been suspended. Contact the administrator.';
+        } else {
+            $_SESSION['user'] = [
+                'id'        => $user['id'],
+                'username'  => $user['username'],
+                'email'     => $user['email'],
+                'name'      => $user['first_name'] . ' ' . $user['last_name'],
+                'role'      => $user['role'] ?? 'user',
+                'google_id' => $user['google_id'] ?? null,
+            ];
+            $conn->close();
+            header($_SESSION['user']['role'] === 'admin'
+                ? 'Location: ../admin/admin.php'
+                : 'Location: ../post/post.php');
+            exit;
+        }
     } else {
         $error = 'Invalid username/email or password.';
     }
 }
+$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -62,21 +63,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
 
-  <!-- Top Navigation -->
   <nav class="topnav">
-    <img src="..images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo" />
+    <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo" />
   </nav>
 
-  <!-- Page Controls -->
   <div class="page-controls">
     <a href="../landing/landing.html" class="ctrl-btn return-btn">&#8592; Return</a>
-    <a href="#" class="ctrl-btn admin-btn">Admin &#8594;</a>
+    <a href="../admin/admin_login.php" class="ctrl-btn admin-btn">Admin &#8594;</a>
   </div>
 
-  <!-- Main Card -->
   <main class="card-container">
 
-    <!-- Left Panel -->
     <div class="left-panel">
       <div class="brand-logo-placeholder">F★</div>
       <h1 class="brand-heading">Explore Fablab<br/>with Fab-ulous</h1>
@@ -91,30 +88,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </div>
 
-    <!-- Right Panel -->
     <div class="right-panel">
       <h2 class="panel-title">Welcome!</h2>
 
-      <!-- Error message from failed login -->
       <?php if ($error): ?>
-        <p style="color:#c0392b; font-size:13px; font-weight:600; margin:0;">
-          <?php echo htmlspecialchars($error); ?>
-        </p>
+        <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
-      <!-- LOGIN FORM -->
       <form method="POST" action="">
-
         <div class="input-group">
           <input type="text" name="username" id="username" class="input-field"
                  placeholder="Username or Email" autocomplete="username" required/>
         </div>
-
         <div class="input-group">
           <input type="password" name="password" id="password" class="input-field"
                  placeholder="Password" autocomplete="current-password" required/>
         </div>
-
         <div class="show-password-row">
           <label class="checkbox-label">
             <input type="checkbox" id="showPass" onchange="togglePassword()"/>
@@ -122,14 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             Show Password
           </label>
         </div>
-
         <button type="submit" class="btn-primary">Sign in</button>
-
       </form>
 
       <p class="or-divider">Or</p>
 
-      <!-- GOOGLE BUTTON — ?google=1 triggers OAuth at top of this file -->
       <a href="?google=1" class="btn-google">
         <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
           <path fill="#EA4335" d="M24 9.5c3.2 0 5.9 1.1 8.1 2.9l6-6C34.5 3.1 29.6 1 24 1 14.8 1 7 6.7 3.7 14.6l7 5.4C12.4 13.8 17.7 9.5 24 9.5z"/>
@@ -146,7 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </span>
         <a href="#" class="link-btn">Forgot Password?</a>
       </div>
-
     </div>
   </main>
 
