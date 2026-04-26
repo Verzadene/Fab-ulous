@@ -21,6 +21,20 @@ if (!$postID) {
     exit;
 }
 
+// Get post owner (needed for notification)
+$ownerStmt = $conn->prepare("SELECT userID FROM posts WHERE postID = ?");
+$ownerStmt->bind_param("i", $postID);
+$ownerStmt->execute();
+$ownerRow = $ownerStmt->get_result()->fetch_assoc();
+$ownerStmt->close();
+
+if (!$ownerRow) {
+    echo json_encode(['success' => false, 'error' => 'Post not found']);
+    $conn->close(); exit;
+}
+$postOwnerID = (int)$ownerRow['userID'];
+
+// Toggle like
 $check = $conn->prepare("SELECT likeID FROM likes WHERE postID = ? AND userID = ?");
 $check->bind_param("ii", $postID, $userID);
 $check->execute();
@@ -40,6 +54,24 @@ if ($alreadyLiked) {
     $ins->execute();
     $ins->close();
     $liked = true;
+
+    // Notify post owner (not when liking own post, not duplicate if already notified)
+    if ($postOwnerID !== $userID) {
+        $notif = $conn->prepare(
+            "INSERT INTO notifications (userID, actor_id, type, post_id)
+             SELECT ?, ?, 'like', ?
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM notifications
+                 WHERE userID = ? AND actor_id = ? AND type = 'like' AND post_id = ?
+             )"
+        );
+        if ($notif) {
+            $notif->bind_param("iiiiii", $postOwnerID, $userID, $postID,
+                                         $postOwnerID, $userID, $postID);
+            $notif->execute();
+            $notif->close();
+        }
+    }
 }
 
 $cntStmt = $conn->prepare("SELECT COUNT(*) AS c FROM likes WHERE postID = ?");

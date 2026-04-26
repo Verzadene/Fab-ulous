@@ -1,17 +1,20 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
+$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
 // Google OAuth redirect
 if (isset($_GET['google'])) {
-    $client_id    = '313306839766-5be832449af0f4lf0autei7oogm2ra5f.apps.googleusercontent.com';
-    $redirect_uri = 'http://localhost/Fab-ulous/oauth/oauth2callback.php';
-    $scope        = urlencode('https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
-    $auth_url     = "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=$client_id&redirect_uri=$redirect_uri&scope=$scope&access_type=offline";
+    $scope    = urlencode('https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
+    $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code'
+              . '&client_id='    . urlencode(GOOGLE_CLIENT_ID)
+              . '&redirect_uri=' . urlencode(GOOGLE_REDIRECT_URI)
+              . '&scope='        . $scope
+              . '&access_type=offline';
     header('Location: ' . $auth_url);
     exit;
 }
@@ -68,7 +71,7 @@ $conn->close();
   </nav>
 
   <div class="page-controls">
-    <a href="../landing/landing.html" class="ctrl-btn return-btn">&#8592; Return</a>
+    <a href="../landing/landing.html" class="ctrl-btn return-btn">&#8592; Return to Landing Page</a>
     <a href="../admin/admin_login.php" class="ctrl-btn admin-btn">Admin &#8594;</a>
   </div>
 

@@ -1,8 +1,9 @@
 <?php
 session_start();
 
-// RBAC: admin only
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+// RBAC: admin and super_admin only
+$role = $_SESSION['user']['role'] ?? '';
+if (!isset($_SESSION['user']) || !in_array($role, ['admin', 'super_admin'])) {
     header('Location: ../admin/admin_login.php');
     exit;
 }
@@ -12,6 +13,7 @@ if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
 
 $adminID       = (int)$_SESSION['user']['id'];
 $adminUsername = $_SESSION['user']['username'];
+$isSuperAdmin  = ($role === 'super_admin');
 
 // ── Handle POST Actions ──────────────────────────────────────────
 $actionMsg = '';
@@ -20,8 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $targetID = (int)($_POST['target_id'] ?? 0);
 
     if ($action === 'ban_user' && $targetID) {
-        $upd = $conn->prepare("UPDATE accounts SET banned = 1 WHERE id = ? AND role = 'user'");
-        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
+        // super_admin can ban anyone except other super_admins; admin can ban only users
+        $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
+        $upd = $conn->prepare("UPDATE accounts SET banned = 1 WHERE id = ? AND role IN $allowedRoles AND id != ?");
+        $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
         $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
@@ -29,11 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
         $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
         $log->execute(); $log->close();
-        $actionMsg = "User banned successfully.";
+        $actionMsg = "User banned.";
     }
 
     if ($action === 'unban_user' && $targetID) {
-        $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ?");
+        $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
+        $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ? AND role IN $allowedRoles");
         $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
         $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
@@ -53,6 +58,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
         $log->execute(); $log->close();
         $actionMsg = "Post removed.";
+    }
+
+    // super_admin only: promote user → admin
+    if ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
+        $upd = $conn->prepare("UPDATE accounts SET role = 'admin' WHERE id = ? AND role = 'user'");
+        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
+        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
+        $sel->bind_param("i", $targetID); $sel->execute();
+        $row = $sel->get_result()->fetch_assoc(); $sel->close();
+        $logAction = "Promoted to admin: " . ($row['username'] ?? 'Unknown');
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
+        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $log->execute(); $log->close();
+        $actionMsg = "User promoted to admin.";
+    }
+
+    // super_admin only: demote admin → user
+    if ($action === 'demote_to_user' && $targetID && $isSuperAdmin) {
+        $upd = $conn->prepare("UPDATE accounts SET role = 'user' WHERE id = ? AND role = 'admin'");
+        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
+        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
+        $sel->bind_param("i", $targetID); $sel->execute();
+        $row = $sel->get_result()->fetch_assoc(); $sel->close();
+        $logAction = "Demoted to user: " . ($row['username'] ?? 'Unknown');
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
+        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $log->execute(); $log->close();
+        $actionMsg = "Admin demoted to user.";
+    }
+
+    // Update commission status / admin note
+    if ($action === 'update_commission' && $targetID) {
+        $newStatus = $_POST['commission_status'] ?? '';
+        $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
+        $allowedStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+        if (in_array($newStatus, $allowedStatuses, true)) {
+            $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ? WHERE commissionID = ?");
+            if ($upd) {
+                $upd->bind_param("ssi", $newStatus, $adminNote, $targetID);
+                $upd->execute(); $upd->close();
+                $actionMsg = "Commission #$targetID updated.";
+            }
+        }
     }
 
     header('Location: admin.php?msg=' . urlencode($actionMsg));
@@ -99,6 +147,23 @@ $fpRes = $conn->query("
 ");
 if ($fpRes) while ($r = $fpRes->fetch_assoc()) $allPosts[] = $r;
 
+// ── Commissions ──────────────────────────────────────────────────
+$commissions = [];
+// Check if admin_note column exists (added by migration_v2.sql)
+$hasAdminNote = false;
+$colRes = $conn->query("SHOW COLUMNS FROM commissions LIKE 'admin_note'");
+if ($colRes && $colRes->num_rows > 0) $hasAdminNote = true;
+
+$noteCol = $hasAdminNote ? ', c.admin_note' : ", '' AS admin_note";
+$cRes = $conn->query("
+    SELECT c.commissionID, c.title, c.description, c.amount, c.status, c.created_at$noteCol,
+           a.username AS requester
+    FROM commissions c
+    LEFT JOIN accounts a ON c.userID = a.id
+    ORDER BY c.created_at DESC
+");
+if ($cRes) while ($r = $cRes->fetch_assoc()) $commissions[] = $r;
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -125,9 +190,13 @@ $conn->close();
       <button class="sidebar-link active" onclick="switchTab('dashboard',this)">Dashboard</button>
       <button class="sidebar-link" onclick="switchTab('users',this)">User Management</button>
       <button class="sidebar-link" onclick="switchTab('feed',this)">Feed Moderator</button>
+      <button class="sidebar-link" onclick="switchTab('commissions',this)">Commissions</button>
       <a href="../post/post.php" class="sidebar-link">Post Section</a>
       <a href="admin_logout.php" class="sidebar-link logout-link">Logout</a>
     </nav>
+    <?php if ($isSuperAdmin): ?>
+      <div class="sidebar-role-badge">Super Admin</div>
+    <?php endif; ?>
   </aside>
 
   <!-- ── MAIN ── -->
@@ -218,18 +287,28 @@ $conn->close();
           </thead>
           <tbody>
             <?php foreach ($users as $u): ?>
+              <?php
+                $uRole       = $u['role'];
+                $isSelf      = ((int)$u['id'] === $adminID);
+                $isSuperTgt  = ($uRole === 'super_admin');
+                $isAdminTgt  = ($uRole === 'admin');
+                // Admins can only act on plain users; super_admin can act on users and admins (not self, not other supers)
+                $canBan      = !$isSelf && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
+                $canPromote  = $isSuperAdmin && $uRole === 'user';
+                $canDemote   = $isSuperAdmin && $isAdminTgt && !$isSelf;
+              ?>
               <tr class="<?php echo $u['banned'] ? 'banned-row' : ''; ?>">
                 <td><?php echo $u['id']; ?></td>
                 <td><?php echo htmlspecialchars($u['first_name'].' '.$u['last_name']); ?></td>
                 <td><?php echo htmlspecialchars($u['username']); ?></td>
                 <td><?php echo htmlspecialchars($u['email']); ?></td>
-                <td><span class="role-badge <?php echo $u['role']; ?>"><?php echo $u['role']; ?></span></td>
+                <td><span class="role-badge <?php echo $uRole; ?>"><?php echo $uRole; ?></span></td>
                 <td><?php echo $u['banned']
                     ? '<span class="banned-badge">Banned</span>'
                     : '<span class="active-badge">Active</span>'; ?></td>
                 <td><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
-                <td>
-                  <?php if ($u['role'] !== 'admin'): ?>
+                <td class="action-cell">
+                  <?php if ($canBan): ?>
                     <form method="POST" style="display:inline;">
                       <input type="hidden" name="action"    value="<?php echo $u['banned'] ? 'unban_user' : 'ban_user'; ?>"/>
                       <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
@@ -239,7 +318,24 @@ $conn->close();
                         <?php echo $u['banned'] ? 'Unban' : 'Ban'; ?>
                       </button>
                     </form>
-                  <?php else: ?>
+                  <?php endif; ?>
+                  <?php if ($canPromote): ?>
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="action"    value="promote_to_admin"/>
+                      <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
+                      <button type="submit" class="action-btn btn-promote"
+                              onclick="return confirm('Promote to admin?')">Promote</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if ($canDemote): ?>
+                    <form method="POST" style="display:inline;">
+                      <input type="hidden" name="action"    value="demote_to_user"/>
+                      <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
+                      <button type="submit" class="action-btn btn-demote"
+                              onclick="return confirm('Demote this admin to user?')">Demote</button>
+                    </form>
+                  <?php endif; ?>
+                  <?php if (!$canBan && !$canPromote && !$canDemote): ?>
                     <span class="no-action">—</span>
                   <?php endif; ?>
                 </td>
@@ -288,6 +384,54 @@ $conn->close();
         </table>
       </div>
     </div><!-- end tab-feed -->
+
+    <!-- ── COMMISSIONS TAB ── -->
+    <div id="tab-commissions" class="tab-content">
+      <h2 class="section-heading">Commission Management</h2>
+      <div class="table-wrap">
+        <table class="admin-table commissions-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Requester</th><th>Title</th><th>Description</th>
+              <th>Amount</th><th>Status</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (empty($commissions)): ?>
+              <tr><td colspan="9" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+            <?php else: ?>
+              <?php foreach ($commissions as $c): ?>
+                <tr>
+                  <td>#<?php echo $c['commissionID']; ?></td>
+                  <td><?php echo htmlspecialchars($c['requester'] ?? '—'); ?></td>
+                  <td class="caption-cell"><?php echo htmlspecialchars($c['title'] ?? '—'); ?></td>
+                  <td class="caption-cell"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 60)) . (mb_strlen($c['description'] ?? '') > 60 ? '…' : ''); ?></td>
+                  <td>&#8369;<?php echo number_format((float)($c['amount'] ?? 0), 2); ?></td>
+                  <td><span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $c['status'])); ?>"><?php echo htmlspecialchars($c['status']); ?></span></td>
+                  <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
+                  <td class="caption-cell"><?php echo htmlspecialchars($c['admin_note'] ?? ''); ?></td>
+                  <td>
+                    <form method="POST" class="commission-form">
+                      <input type="hidden" name="action"    value="update_commission"/>
+                      <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
+                      <select name="commission_status" class="commission-select">
+                        <?php foreach (['Pending','In Progress','Completed','Cancelled'] as $s): ?>
+                          <option value="<?php echo $s; ?>" <?php echo $c['status'] === $s ? 'selected' : ''; ?>><?php echo $s; ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                      <input type="text" name="admin_note" class="commission-note"
+                             value="<?php echo htmlspecialchars($c['admin_note'] ?? ''); ?>"
+                             placeholder="Add a note…" maxlength="500"/>
+                      <button type="submit" class="action-btn btn-save">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div><!-- end tab-commissions -->
 
   </main>
 </div>

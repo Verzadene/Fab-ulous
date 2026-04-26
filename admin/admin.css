@@ -254,13 +254,42 @@ html, body {
   font-size: 12px;
   font-weight: 700;
 }
-.role-badge.admin { background: rgba(52,152,219,0.18); color: #5dade2; }
-.role-badge.user  { background: rgba(119,204,129,0.15); color: var(--green-active); }
+.role-badge.admin       { background: rgba(52,152,219,0.18); color: #5dade2; }
+.role-badge.super_admin { background: rgba(155,89,182,0.20); color: #bb8fce; }
+.role-badge.user        { background: rgba(119,204,129,0.15); color: var(--green-active); }
 .banned-badge { color: #e74c3c; font-weight: 700; font-size: 13px; }
 .active-badge { color: var(--green-active); font-weight: 700; font-size: 13px; }
 .no-action    { color: var(--text-muted); }
 
+/* Commission status badges */
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.status-badge.status-pending     { background: rgba(243,156,18,0.18); color: #f39c12; }
+.status-badge.status-in-progress { background: rgba(52,152,219,0.18); color: #5dade2; }
+.status-badge.status-completed   { background: rgba(46,204,113,0.18); color: #2ecc71; }
+.status-badge.status-cancelled   { background: rgba(231,76,60,0.15);  color: #e74c3c; }
+
+/* Sidebar super-admin label */
+.sidebar-role-badge {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #bb8fce;
+  background: rgba(155,89,182,0.15);
+  border-radius: 999px;
+  padding: 4px 12px;
+  letter-spacing: 0.5px;
+}
+
 /* ── Action Buttons ── */
+.action-cell { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
 .action-btn {
   padding: 6px 14px;
   border: none;
@@ -270,10 +299,47 @@ html, body {
   font-weight: 700;
   cursor: pointer;
   transition: opacity 0.18s, transform 0.15s;
+  white-space: nowrap;
 }
 .action-btn:hover { opacity: 0.82; transform: translateY(-1px); }
-.btn-ban   { background: rgba(231,76,60,0.15);  color: #e74c3c; }
-.btn-unban { background: rgba(119,204,129,0.15); color: var(--green-active); }
+.btn-ban     { background: rgba(231,76,60,0.15);   color: #e74c3c; }
+.btn-unban   { background: rgba(119,204,129,0.15);  color: var(--green-active); }
+.btn-promote { background: rgba(52,152,219,0.18);   color: #5dade2; }
+.btn-demote  { background: rgba(155,89,182,0.18);   color: #bb8fce; }
+.btn-save    { background: rgba(119,204,129,0.20);  color: var(--green-active); }
+
+/* ── Commission Form (inline in table) ── */
+.commission-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+.commission-select {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text-white);
+  cursor: pointer;
+}
+.commission-select option { background: #1a2820; color: var(--text-white); }
+.commission-note {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 6px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-white);
+  outline: none;
+}
+.commission-note:focus { border-color: var(--green-accent); }
+.commission-note::placeholder { color: rgba(255,255,255,0.35); }
 
 /* ── Print ── */
 @media print {

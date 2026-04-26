@@ -1,6 +1,5 @@
 /* ============================================
    LANDING.CSS — FABulous
-   Layout: 1440px wide
    ============================================ */
 
 /* ---------- Variables ---------- */
@@ -15,7 +14,6 @@
   --radius-pill:     999px;
 }
 
-/* ---------- Bootstrap Override ---------- */
 html, body {
   background-color: var(--bg) !important;
   font-family: var(--font) !important;
@@ -23,6 +21,8 @@ html, body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 /* ============================================
@@ -38,48 +38,20 @@ html, body {
   background-color: var(--bg) !important;
 }
 
-.nav-logo-placeholder {
-  width: 58px;
-  height: 58px;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.08);
-  border: 2px dashed rgba(255,255,255,0.30);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--text-white);
-  letter-spacing: -0.5px;
-  flex-shrink: 0;
-}
-
 .nav-logo-img {
-  width: 58px;
-  height: auto;
+  height: 52px;
+  width: auto;
   object-fit: contain;
   flex-shrink: 0;
 }
 
-
-
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 24px;
 }
 
-.nav-link-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-white) !important;
-  text-decoration: none;
-  font-family: var(--font);
-  transition: opacity 0.2s;
-}
-.nav-link-text:hover { opacity: 0.65; }
-
-/* Sign in — white pill button */
+/* Sign in button */
 .btn-signin {
   min-width: 120px;
   height: 42px;
@@ -103,24 +75,21 @@ html, body {
   transform: translateY(-2px);
   box-shadow: 0 6px 18px rgba(0,0,0,0.25);
 }
-.btn-signin:active { transform: scale(0.97); }
 
-/* Hamburger */
+/* Hamburger (visible on mobile) */
 .hamburger-btn {
   width: 36px;
   height: 36px;
   background: transparent !important;
   border: none;
   cursor: pointer;
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 5px;
   padding: 0;
-  transition: opacity 0.2s;
 }
-.hamburger-btn:hover { opacity: 0.65; }
 .hamburger-btn span {
   display: block;
   width: 26px;
@@ -129,7 +98,7 @@ html, body {
   border-radius: 2px;
 }
 
-/* Double line divider using box-shadow trick */
+/* Nav divider */
 .nav-divider {
   width: 100%;
   height: 0;
@@ -137,7 +106,6 @@ html, body {
   border-top: 2px solid var(--green-accent);
   box-shadow: 0 4px 0 0 var(--green-accent);
   opacity: 0.9;
-  margin: 0;
 }
 
 /* ============================================
@@ -149,15 +117,16 @@ html, body {
   display: flex;
   align-items: center;
   padding: 60px 52px;
+  gap: 32px;
   background-color: var(--bg) !important;
 }
 
-/* LEFT */
 .hero-left {
   flex: 0 0 55%;
   display: flex;
   flex-direction: column;
   gap: 28px;
+  min-width: 0;
 }
 
 .hero-eyebrow {
@@ -165,23 +134,21 @@ html, body {
   font-weight: 400;
   font-style: italic;
   color: var(--text-muted);
-  font-family: var(--font);
 }
 
 .hero-title {
-  font-size: 110px;
+  font-size: clamp(56px, 9vw, 110px);
   font-weight: 800;
   line-height: 0.92;
   letter-spacing: -2px;
   color: var(--text-white);
-  font-family: var(--font);
 }
 
 /* Search bar */
 .search-wrap {
   display: flex;
   align-items: center;
-  width: 640px;
+  width: min(640px, 100%);
   height: 60px;
   border: 2px solid var(--text-white);
   border-radius: var(--radius-pill);
@@ -195,19 +162,13 @@ html, body {
   background: transparent !important;
   border: none !important;
   outline: none;
-  box-shadow: none !important;
   padding: 0 24px;
   font-family: var(--font);
   font-size: 16px;
   color: var(--text-white) !important;
 }
 .search-input::placeholder { color: rgba(255,255,255,0.35); }
-.search-input:focus {
-  background: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  color: var(--text-white) !important;
-}
+.search-input:focus { background: transparent !important; outline: none !important; }
 
 .search-btn {
   width: 58px;
@@ -224,14 +185,9 @@ html, body {
 }
 .search-btn:hover { background: rgba(255,255,255,0.10) !important; }
 
-/* CTA row */
-.hero-btns {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
+/* CTA buttons */
+.hero-btns { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 
-/* Sign Up — green pill */
 .btn-signup {
   min-width: 130px;
   height: 46px;
@@ -247,18 +203,14 @@ html, body {
   justify-content: center;
   text-decoration: none !important;
   padding: 0 28px;
-  transition: background 0.22s, border-color 0.22s, transform 0.15s, box-shadow 0.22s;
+  transition: background 0.22s, border-color 0.22s, transform 0.15s;
 }
 .btn-signup:hover {
   background: var(--green-btn-hover) !important;
   border-color: var(--green-btn-hover) !important;
-  color: var(--text-white) !important;
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(119,204,129,0.35);
 }
-.btn-signup:active { transform: scale(0.97); }
 
-/* About us — outline pill */
 .btn-aboutus {
   min-width: 130px;
   height: 46px;
@@ -278,12 +230,10 @@ html, body {
 }
 .btn-aboutus:hover {
   background: rgba(255,255,255,0.10) !important;
-  color: var(--text-white) !important;
   transform: translateY(-2px);
 }
-.btn-aboutus:active { transform: scale(0.97); }
 
-/* RIGHT */
+/* Hero right */
 .hero-right {
   flex: 0 0 45%;
   display: flex;
@@ -291,37 +241,22 @@ html, body {
   align-items: center;
   text-align: center;
   gap: 20px;
-}
-
-.hero-logo-placeholder {
-  width: 130px;
-  height: 130px;
-  border-radius: 50%;
-  border: 3px dashed rgba(255,255,255,0.40);
-  background: rgba(255,255,255,0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--text-white);
-  font-family: var(--font);
+  min-width: 0;
 }
 
 .hero-logo-img {
-  width: 130px;
-  height: 130px;
+  width: clamp(90px, 12vw, 130px);
+  height: auto;
   border-radius: 50%;
   object-fit: contain;
 }
 
 .hero-tagline {
-  font-size: 46px;
+  font-size: clamp(28px, 4vw, 46px);
   font-weight: 800;
   line-height: 1.1;
   color: var(--text-white);
   letter-spacing: -0.5px;
-  font-family: var(--font);
 }
 
 .hero-desc {
@@ -330,5 +265,134 @@ html, body {
   line-height: 1.65;
   color: var(--text-white);
   max-width: 380px;
-  font-family: var(--font);
+}
+
+/* ============================================
+   CONTACT FOOTER
+   ============================================ */
+.contact-section {
+  width: 100%;
+  background: rgba(0,0,0,0.30);
+  border-top: 2px solid var(--green-accent);
+  padding: 72px 52px 48px;
+}
+
+.contact-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.contact-heading {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  color: var(--text-white);
+  margin-bottom: 12px;
+}
+
+.contact-sub {
+  font-size: 15px;
+  color: var(--text-muted);
+  max-width: 560px;
+  margin: 0 auto 40px;
+  line-height: 1.65;
+}
+
+.contact-cards {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.contact-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 28px 32px;
+  min-width: 200px;
+  flex: 1;
+  max-width: 260px;
+  transition: background 0.2s, transform 0.2s;
+}
+.contact-card:hover {
+  background: rgba(255,255,255,0.10);
+  transform: translateY(-4px);
+}
+
+.contact-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.contact-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--green-btn);
+  margin-bottom: 6px;
+}
+
+.contact-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-white);
+  word-break: break-all;
+}
+
+.contact-copy {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 900px) {
+  .hero { padding: 48px 32px; gap: 24px; }
+  .hero-left { flex: 0 0 60%; }
+  .hero-right { flex: 0 0 40%; }
+}
+
+@media (max-width: 640px) {
+  .fab-nav { padding: 0 24px; height: 68px; }
+  .hamburger-btn { display: flex; }
+  .nav-right { gap: 12px; }
+
+  /* Stack nav items below bar when open */
+  .nav-right.nav-open {
+    position: fixed;
+    top: 68px; left: 0; right: 0;
+    background: var(--bg);
+    flex-direction: column;
+    padding: 20px 24px;
+    z-index: 100;
+    border-bottom: 2px solid var(--green-accent);
+  }
+  .nav-right.nav-open .btn-signin { width: 100%; }
+
+  .hero {
+    flex-direction: column;
+    padding: 32px 24px;
+    min-height: 0;
+    padding-top: 88px;
+    gap: 32px;
+  }
+  .hero-left  { flex: none; width: 100%; gap: 20px; }
+  .hero-right { flex: none; width: 100%; }
+
+  .contact-section { padding: 48px 24px 32px; }
+  .contact-cards { gap: 16px; }
+  .contact-card { max-width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .hero-title { letter-spacing: -1px; }
+  .search-wrap { height: 50px; }
+  .hero-btns { flex-direction: column; align-items: flex-start; }
+  .btn-signup, .btn-aboutus { width: 100%; }
 }
