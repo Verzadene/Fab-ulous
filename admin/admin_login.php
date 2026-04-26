@@ -54,18 +54,25 @@ $conn->close();
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="../login/login.css"/>
   <style>
-    .left-panel { background: #1a2820; }
-    .admin-badge {
-      display: inline-block;
-      background: rgba(52,152,219,0.18);
-      color: #5dade2;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 3px 12px;
-      border-radius: 999px;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
+  .left-panel { background: #1a2820; }
+  .admin-badge {
+    display: inline-block;
+    background: rgba(52,152,219,0.18);
+    color: #5dade2;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 12px;
+    border-radius: 999px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .brand-logo-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
   </style>
 </head>
 <body>
@@ -80,7 +87,7 @@ $conn->close();
 
   <main class="card-container">
     <div class="left-panel">
-      <div class="brand-logo-placeholder">F★</div>
+      <img src="../images/Big Logo.png" alt="FABulous Logo" class="brand-logo-img" />
       <h1 class="brand-heading">Admin Access<br/>FABulous</h1>
       <p class="brand-desc">Restricted to authorized Fab Lab administrators only.</p>
       <div class="carousel-dots">
