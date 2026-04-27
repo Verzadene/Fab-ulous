@@ -1,0 +1,208 @@
+.commissions-layout {
+  width: min(var(--content-width), 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px;
+  background: linear-gradient(180deg, rgba(38, 60, 47, 0.92), rgba(34, 54, 42, 0.9));
+  border: 1px solid rgba(120, 214, 140, 0.1);
+  border-radius: 22px;
+}
+
+.commission-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 26px;
+}
+
+.commission-hero h1 {
+  color: var(--text-dark);
+  font-size: 32px;
+  font-weight: 800;
+  margin: 4px 0 10px;
+}
+
+.commission-hero p {
+  max-width: 760px;
+  color: #5f6d63;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.commission-admin-link {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--text-dark);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.commission-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.commission-stat {
+  padding: 20px;
+}
+
+.commission-stat span {
+  display: block;
+  color: #6f7e74;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.commission-stat strong {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-dark);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.commission-table-card {
+  padding: 20px;
+}
+
+.commission-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.commission-table-head h2 {
+  color: var(--text-dark);
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.commission-table-wrap {
+  overflow-x: auto;
+  border-radius: 18px;
+  border: 1px solid #edf2ee;
+}
+
+.commission-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  color: var(--text-dark);
+}
+
+.commission-table th {
+  padding: 13px 16px;
+  background: #f6faf7;
+  color: #698072;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.commission-table td {
+  padding: 14px 16px;
+  border-top: 1px solid #edf2ee;
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.commission-description {
+  min-width: 220px;
+  color: #4f5d54;
+}
+
+.thread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #eef9f0;
+  color: #4f8b63;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.status-badge.status-pending {
+  background: rgba(243,156,18,0.18);
+  color: #f39c12;
+}
+
+.status-badge.status-in-progress {
+  background: rgba(52,152,219,0.18);
+  color: #5dade2;
+}
+
+.status-badge.status-completed {
+  background: rgba(46,204,113,0.18);
+  color: #2ecc71;
+}
+
+.status-badge.status-cancelled {
+  background: rgba(231,76,60,0.15);
+  color: #e74c3c;
+}
+
+.messages-empty {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px;
+  border: 1.5px dashed #dbe5de;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f9fbf9 0%, #f4f8f4 100%);
+  color: #617065;
+  text-align: center;
+}
+
+.messages-empty strong {
+  color: #132019;
+  font-size: 18px;
+}
+
+.commission-empty {
+  min-height: 260px;
+}
+
+@media (max-width: 980px) {
+  .commission-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .commission-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .commission-stats {
+    grid-template-columns: 1fr;
+  }
+}

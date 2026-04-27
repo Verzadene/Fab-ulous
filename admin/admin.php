@@ -1,15 +1,20 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
 // RBAC: admin and super_admin only
 $role = $_SESSION['user']['role'] ?? '';
-if (!isset($_SESSION['user']) || !in_array($role, ['admin', 'super_admin'])) {
+if (!isset($_SESSION['user']) || !in_array($role, ['admin', 'super_admin'], true)) {
     header('Location: ../admin/admin_login.php');
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
+if (empty($_SESSION['mfa_verified'])) {
+    header('Location: ../login/verify_mfa.php');
+    exit;
+}
+
+$conn = db_connect();
 
 $adminID       = (int)$_SESSION['user']['id'];
 $adminUsername = $_SESSION['user']['username'];
@@ -226,9 +231,9 @@ $conn->close();
       </div>
     </div>
 
-    <?php if ($actionMsg): ?>
-      <div class="action-msg"><?php echo $actionMsg; ?></div>
-    <?php endif; ?>
+    <div class="action-msg" id="liveActionMsg" <?php echo $actionMsg ? '' : 'style="display:none;"'; ?>>
+      <?php echo htmlspecialchars($actionMsg); ?>
+    </div>
 
     <!-- ── DASHBOARD TAB ── -->
     <div id="tab-dashboard" class="tab-content active">
@@ -420,11 +425,20 @@ $conn->close();
                   <td class="caption-cell"><?php echo htmlspecialchars($c['title'] ?? '—'); ?></td>
                   <td class="caption-cell"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 60)) . (mb_strlen($c['description'] ?? '') > 60 ? '…' : ''); ?></td>
                   <td>&#8369;<?php echo number_format((float)($c['amount'] ?? 0), 2); ?></td>
-                  <td><span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $c['status'])); ?>"><?php echo htmlspecialchars($c['status']); ?></span></td>
-                  <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
-                  <td class="caption-cell"><?php echo htmlspecialchars($c['admin_note'] ?? ''); ?></td>
                   <td>
-                    <form method="POST" class="commission-form">
+                    <span
+                      class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $c['status'])); ?>"
+                      id="commission-status-<?php echo $c['commissionID']; ?>"
+                    >
+                      <?php echo htmlspecialchars($c['status']); ?>
+                    </span>
+                  </td>
+                  <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
+                  <td class="caption-cell" id="commission-note-display-<?php echo $c['commissionID']; ?>">
+                    <?php echo htmlspecialchars(($c['admin_note'] ?? '') !== '' ? $c['admin_note'] : 'No note yet.'); ?>
+                  </td>
+                  <td>
+                    <form method="POST" class="commission-form" data-commission-id="<?php echo $c['commissionID']; ?>">
                       <input type="hidden" name="action"    value="update_commission"/>
                       <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
                       <select name="commission_status" class="commission-select">
@@ -456,6 +470,68 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
 }
+
+const liveActionMsg = document.getElementById('liveActionMsg');
+
+function showActionMessage(message, isError = false) {
+  liveActionMsg.textContent = message;
+  liveActionMsg.style.display = 'block';
+  liveActionMsg.style.borderColor = isError ? '#e74c3c' : '';
+  liveActionMsg.style.color = isError ? '#ff8a8a' : '';
+  liveActionMsg.style.background = isError ? 'rgba(231,76,60,0.12)' : '';
+}
+
+function statusClassName(status) {
+  return 'status-badge status-' + String(status).toLowerCase().replaceAll(' ', '-');
+}
+
+async function saveCommissionForm(form, successMessage) {
+  const payload = new FormData(form);
+
+  try {
+    const response = await fetch('commission_update.php', {
+      method: 'POST',
+      body: payload
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      showActionMessage(data.error || 'Commission update failed.', true);
+      return;
+    }
+
+    const commissionId = form.dataset.commissionId;
+    const statusBadge = document.getElementById('commission-status-' + commissionId);
+    const noteDisplay = document.getElementById('commission-note-display-' + commissionId);
+    const noteField = form.querySelector('.commission-note');
+
+    if (statusBadge) {
+      statusBadge.className = statusClassName(data.status);
+      statusBadge.textContent = data.status;
+    }
+
+    if (noteDisplay && noteField) {
+      noteDisplay.textContent = noteField.value.trim() || 'No note yet.';
+    }
+
+    showActionMessage(successMessage || `Commission #${commissionId} updated.`);
+  } catch (error) {
+    showActionMessage('Commission update failed. Please try again.', true);
+  }
+}
+
+document.querySelectorAll('.commission-form').forEach(form => {
+  const select = form.querySelector('.commission-select');
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    saveCommissionForm(form, `Commission #${form.dataset.commissionId} saved.`);
+  });
+
+  select?.addEventListener('change', () => {
+    saveCommissionForm(form, `Commission #${form.dataset.commissionId} status updated.`);
+  });
+});
 
 new Chart(document.getElementById('pipelineChart').getContext('2d'), {
   type: 'doughnut',

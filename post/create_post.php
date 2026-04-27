@@ -1,13 +1,13 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
-if (!isset($_SESSION['user'])) {
+if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     header('Location: ../login/login.php');
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) { die("DB connection failed."); }
+$conn = db_connect();
 
 $userID   = (int)$_SESSION['user']['id'];
 $caption  = trim($_POST['caption'] ?? '');

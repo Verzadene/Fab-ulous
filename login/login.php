@@ -2,24 +2,36 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
 // Google OAuth redirect
 if (isset($_GET['google'])) {
-    $scope    = urlencode('https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
+    if (trim(GOOGLE_CLIENT_SECRET) === '') {
+        header('Location: login.php?error=google_oauth_config');
+        exit;
+    }
+
+    $scope    = urlencode('openid https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email');
     $auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?response_type=code'
               . '&client_id='    . urlencode(GOOGLE_CLIENT_ID)
               . '&redirect_uri=' . urlencode(GOOGLE_REDIRECT_URI)
               . '&scope='        . $scope
-              . '&access_type=offline';
+              . '&access_type=offline'
+              . '&prompt=select_account';
     header('Location: ' . $auth_url);
     exit;
 }
 
+$conn = db_connect();
 $error = '';
+
+if (isset($_GET['error'])) {
+    $error = match ($_GET['error']) {
+        'banned' => 'Your account has been suspended. Contact the administrator.',
+        'google_oauth_config' => 'Google sign-in is not configured yet. Add your client secret in config.local.php.',
+        'oauth_exchange_failed' => 'Google sign-in could not be completed. Please try again.',
+        default => '',
+    };
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $usernameOrEmail = trim($_POST['username']);
     $password        = $_POST['password'];
@@ -34,19 +46,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user['banned']) {
             $error = 'Your account has been suspended. Contact the administrator.';
         } else {
-            $_SESSION['user'] = [
-                'id'        => $user['id'],
-                'username'  => $user['username'],
-                'email'     => $user['email'],
-                'name'      => $user['first_name'] . ' ' . $user['last_name'],
-                'role'      => $user['role'] ?? 'user',
-                'google_id' => $user['google_id'] ?? null,
-            ];
-            $conn->close();
-            header(in_array($_SESSION['user']['role'], ['admin', 'super_admin'], true)
-                ? 'Location: ../admin/admin.php'
-                : 'Location: ../post/post.php');
-            exit;
+            if (!accounts_support_mfa($conn)) {
+                $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
+            } else {
+                $code = (string) random_int(100000, 999999);
+
+                if (!store_mfa_code($conn, (int) $user['id'], $code)) {
+                    $error = 'We could not start MFA verification. Please try again.';
+                } else {
+                    clear_pending_auth();
+                    clear_google_registration_prefill();
+
+                    $_SESSION['pending_mfa_user'] = [
+                        'id' => (int) $user['id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'first_name' => $user['first_name'],
+                        'last_name' => $user['last_name'],
+                        'role' => $user['role'] ?? 'user',
+                        'google_id' => $user['google_id'] ?? null,
+                    ];
+                    $_SESSION['pending_mfa_sent_at'] = time();
+
+                    $mailSent = send_mfa_code_email(
+                        $user['email'],
+                        trim($user['first_name'] . ' ' . $user['last_name']),
+                        $code
+                    );
+
+                    if (!$mailSent) {
+                        clear_pending_auth();
+                        clear_mfa_code($conn, (int) $user['id']);
+                        $error = get_last_mail_error() ?: 'A verification code could not be sent to your email address.';
+                    } else {
+                        header('Location: verify_mfa.php');
+                        $conn->close();
+                        exit;
+                    }
+
+                    if (!$error) {
+                        header('Location: verify_mfa.php');
+                        $conn->close();
+                        exit;
+                    }
+                }
+            }
         }
     } else {
         $error = 'Invalid username/email or password.';

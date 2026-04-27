@@ -199,6 +199,12 @@ html, body {
   border-left: 3px solid #c0392b;
 }
 
+.prefill-notice {
+  color: #235236;
+  background: rgba(119,204,129,0.18);
+  border-left-color: #4e7a5e;
+}
+
 /* ---------- Name Row ---------- */
 .name-row {
   display: flex;

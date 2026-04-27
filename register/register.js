@@ -1,3 +1,24 @@
+document.addEventListener('DOMContentLoaded', async () => {
+  const notice = document.getElementById('prefillNotice');
+
+  try {
+    const response = await fetch('prefill.php', { credentials: 'same-origin' });
+    const data = await response.json();
+    const prefill = data?.prefill ?? {};
+
+    if (prefill.googleLinked) {
+      if (prefill.firstName) document.getElementById('firstName').value = prefill.firstName;
+      if (prefill.lastName) document.getElementById('lastName').value = prefill.lastName;
+      if (prefill.email) document.getElementById('email').value = prefill.email;
+
+      notice.textContent = 'Google details were carried over for you. Finish creating your username and password to complete sign up.';
+      notice.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Could not load registration prefill.', error);
+  }
+});
+
 document.getElementById('regForm').addEventListener('submit', function(e) {
   e.preventDefault();
 

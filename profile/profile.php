@@ -1,13 +1,18 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
-if (!isset($_SESSION['user'])) {
+if (empty($_SESSION['user'])) {
     header('Location: ../login/login.php');
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) die("Connection failed.");
+if (empty($_SESSION['mfa_verified'])) {
+    header('Location: ../login/verify_mfa.php');
+    exit;
+}
+
+$conn = db_connect();
 
 $userID = (int)$_SESSION['user']['id'];
 $role   = $_SESSION['user']['role'] ?? 'user';
@@ -152,9 +157,9 @@ $memberSince = date('M d, Y', strtotime($user['created_at']));
     <div class="nav-links">
       <a href="../post/post.php" class="nav-item">Home</a>
       <a href="#" class="nav-item">Projects</a>
-      <a href="#" class="nav-item">Commissions</a>
+      <a href="../post/commissions.php" class="nav-item">Commissions</a>
       <a href="#" class="nav-item">History</a>
-      <?php if ($role === 'admin'): ?>
+      <?php if (in_array($role, ['admin', 'super_admin'], true)): ?>
         <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin &#9632;</a>
       <?php endif; ?>
     </div>
@@ -180,7 +185,7 @@ $memberSince = date('M d, Y', strtotime($user['created_at']));
       </div>
       <nav class="sidebar-nav">
         <a href="../post/post.php" class="sidebar-link">News Feed</a>
-        <a href="#" class="sidebar-link">Messages</a>
+        <a href="../post/messages.php" class="sidebar-link">Messages</a>
         <a href="#" class="sidebar-link">Uploads</a>
         <a href="profile.php" class="sidebar-link active">Settings</a>
         <a href="../login/logout.php" class="sidebar-link sidebar-logout">Logout</a>

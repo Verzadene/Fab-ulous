@@ -1,13 +1,13 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
 if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admin', 'super_admin'], true)) {
     header('Location: admin.php');
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) { die("Connection failed: " . $conn->connect_error); }
+$conn = db_connect();
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -26,17 +26,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user['banned']) {
             $error = 'This admin account has been suspended.';
         } else {
-            $_SESSION['user'] = [
-                'id'        => $user['id'],
-                'username'  => $user['username'],
-                'email'     => $user['email'],
-                'name'      => $user['first_name'] . ' ' . $user['last_name'],
-                'role'      => $user['role'],
-                'google_id' => $user['google_id'] ?? null,
-            ];
-            $conn->close();
-            header('Location: admin.php');
-            exit;
+            if (!accounts_support_mfa($conn)) {
+                $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
+            } else {
+                $code = (string) random_int(100000, 999999);
+
+                if (!store_mfa_code($conn, (int) $user['id'], $code)) {
+                    $error = 'We could not start MFA verification. Please try again.';
+                } else {
+                    clear_pending_auth();
+                    $_SESSION['pending_mfa_user'] = [
+                        'id' => (int) $user['id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'first_name' => $user['first_name'],
+                        'last_name' => $user['last_name'],
+                        'role' => $user['role'],
+                        'google_id' => $user['google_id'] ?? null,
+                    ];
+                    $_SESSION['pending_mfa_sent_at'] = time();
+
+                    $mailSent = send_mfa_code_email(
+                        $user['email'],
+                        trim($user['first_name'] . ' ' . $user['last_name']),
+                        $code
+                    );
+
+                    if (!$mailSent) {
+                        clear_pending_auth();
+                        clear_mfa_code($conn, (int) $user['id']);
+                        $error = get_last_mail_error() ?: 'A verification code could not be sent to this admin email address.';
+                    } else {
+                        header('Location: ../login/verify_mfa.php');
+                        $conn->close();
+                        exit;
+                    }
+                }
+            }
         }
     } else {
         $error = 'Invalid credentials or not an admin account.';

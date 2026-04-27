@@ -1,17 +1,14 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user'])) {
+if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     echo json_encode(['success' => false, 'error' => 'Not logged in']);
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) {
-    echo json_encode(['success' => false, 'error' => 'DB error']);
-    exit;
-}
+$conn = db_connect();
 
 $myID = (int)$_SESSION['user']['id'];
 

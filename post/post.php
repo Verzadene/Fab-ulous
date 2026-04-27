@@ -1,15 +1,18 @@
 <?php
 session_start();
+require_once __DIR__ . '/../config.php';
 
-if (!isset($_SESSION['user'])) {
+if (empty($_SESSION['user'])) {
     header('Location: ../login/login.php');
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "fab_ulous");
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+if (empty($_SESSION['mfa_verified'])) {
+    header('Location: ../login/verify_mfa.php');
+    exit;
 }
+
+$conn = db_connect();
 
 $userID = (int)$_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
@@ -197,7 +200,7 @@ $conn->close();
       <p class="drawer-username">@<?php echo htmlspecialchars($username); ?></p>
     </div>
     <a href="post.php" class="drawer-link active" onclick="closeDrawer()">News Feed</a>
-    <a href="#" class="drawer-link" onclick="closeDrawer()">Messages</a>
+    <a href="messages.php" class="drawer-link" onclick="closeDrawer()">Messages</a>
     <a href="#" class="drawer-link" onclick="closeDrawer()">Uploads</a>
     <a href="../profile/profile.php" class="drawer-link" onclick="closeDrawer()">Settings</a>
     <?php if ($isAdmin): ?>
@@ -211,7 +214,7 @@ $conn->close();
     <div class="nav-links">
       <a href="post.php" class="nav-item active">Home</a>
       <a href="#" class="nav-item">Projects</a>
-      <a href="#" class="nav-item">Commissions</a>
+      <a href="commissions.php" class="nav-item">Commissions</a>
       <a href="#" class="nav-item">History</a>
       <?php if ($isAdmin): ?>
         <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin</a>
