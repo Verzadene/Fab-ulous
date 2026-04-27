@@ -35,7 +35,7 @@ defined('DB_HOST') || define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 defined('DB_USER') || define('DB_USER', getenv('DB_USER') ?: 'root');
 defined('DB_PASS') || define('DB_PASS', getenv('DB_PASS') ?: '');
 defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'fab_ulous');
-defined('DB_PORT') || define('DB_PORT', (int) (getenv('DB_PORT') ?: 3307));
+defined('DB_PORT') || define('DB_PORT', (int) (getenv('DB_PORT') ?: 3306));
 
 // SMTP / email
 defined('SMTP_HOST') || define('SMTP_HOST', getenv('SMTP_HOST') ?: '');
