@@ -161,8 +161,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Reject / cancel a friend request (deletes the record so either side can resend)
-    if ($action === 'reject' || $action === 'cancel') {
+    // Reject / cancel / remove a friendship (deletes the record so either side can resend)
+    if ($action === 'reject' || $action === 'cancel' || $action === 'remove') {
         $friendshipID = (int)($_POST['friendship_id'] ?? 0);
         if (!$friendshipID) {
             echo json_encode(['success' => false, 'error' => 'Invalid ID']);

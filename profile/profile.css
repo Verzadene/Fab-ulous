@@ -4,6 +4,105 @@
    ============================================ */
 
 /* ── Settings card ── */
+.page-body {
+  display: flex;
+  width: 100%;
+  min-height: calc(100vh - var(--nav-height));
+  padding: 28px 32px;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatar-placeholder {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--text-white);
+  border: 3px solid rgba(255,255,255,0.6);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.avatar-icon {
+  width: 90px;
+  height: 90px;
+}
+
+.profile-username {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-white);
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.profile-email {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.sidebar-link {
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-white);
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-align: center;
+  transition: background 0.2s, transform 0.15s;
+  border: 2px solid transparent;
+}
+.sidebar-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-white);
+  transform: translateX(3px);
+}
+.sidebar-link.active {
+  background: var(--text-white);
+  color: var(--text-dark) !important;
+  border-color: var(--text-white);
+}
+.sidebar-link.active:hover {
+  background: rgba(255,255,255,0.90);
+  color: var(--text-dark) !important;
+}
+
+.sidebar-logout {
+  color: rgba(255,120,120,0.85) !important;
+  margin-top: 8px;
+}
+.sidebar-logout:hover {
+  background: rgba(255,80,80,0.12) !important;
+  color: #ff8080 !important;
+}
+
 .settings-card {
   background: #fff;
   border-radius: var(--radius-card);
@@ -205,6 +304,13 @@
 .field-input.mismatch { border-color: #e74c3c; }
 
 /* ── Responsive ── */
+@media (max-width: 900px) {
+  .page-body { flex-direction: column; padding: 16px; }
+  .sidebar,
+  .feed,
+  .notif-panel { width: 100%; max-width: none; }
+}
+
 @media (max-width: 640px) {
   .settings-card    { padding: 24px 16px; }
   .settings-row     { flex-direction: column; }

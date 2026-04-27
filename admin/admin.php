@@ -149,14 +149,27 @@ if ($fpRes) while ($r = $fpRes->fetch_assoc()) $allPosts[] = $r;
 
 // ── Commissions ──────────────────────────────────────────────────
 $commissions = [];
-// Check if admin_note column exists (added by migration_v2.sql)
-$hasAdminNote = false;
-$colRes = $conn->query("SHOW COLUMNS FROM commissions LIKE 'admin_note'");
-if ($colRes && $colRes->num_rows > 0) $hasAdminNote = true;
+$commissionColumns = [];
+$colRes = $conn->query("SHOW COLUMNS FROM commissions");
+if ($colRes) {
+    while ($col = $colRes->fetch_assoc()) {
+        $commissionColumns[$col['Field']] = true;
+    }
+}
 
+$hasAdminNote = isset($commissionColumns['admin_note']);
 $noteCol = $hasAdminNote ? ', c.admin_note' : ", '' AS admin_note";
+
+if (isset($commissionColumns['commission_name'])) {
+    $titleExpr = "COALESCE(NULLIF(c.commission_name, ''), c.description)";
+} elseif (isset($commissionColumns['title'])) {
+    $titleExpr = "COALESCE(NULLIF(c.title, ''), c.description)";
+} else {
+    $titleExpr = "c.description";
+}
+
 $cRes = $conn->query("
-    SELECT c.commissionID, c.title, c.description, c.amount, c.status, c.created_at$noteCol,
+    SELECT c.commissionID, $titleExpr AS title, c.description, c.amount, c.status, c.created_at$noteCol,
            a.username AS requester
     FROM commissions c
     LEFT JOIN accounts a ON c.userID = a.id

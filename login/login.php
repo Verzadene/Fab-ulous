@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'google_id' => $user['google_id'] ?? null,
             ];
             $conn->close();
-            header($_SESSION['user']['role'] === 'admin'
+            header(in_array($_SESSION['user']['role'], ['admin', 'super_admin'], true)
                 ? 'Location: ../admin/admin.php'
                 : 'Location: ../post/post.php');
             exit;

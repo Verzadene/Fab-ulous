@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-if (isset($_SESSION['user']) && $_SESSION['user']['role'] === 'admin') {
+if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admin', 'super_admin'], true)) {
     header('Location: admin.php');
     exit;
 }
@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'];
 
     $stmt = $conn->prepare(
-        "SELECT * FROM accounts WHERE (username = ? OR email = ?) AND role = 'admin'"
+        "SELECT * FROM accounts WHERE (username = ? OR email = ?) AND role IN ('admin', 'super_admin')"
     );
     $stmt->bind_param("ss", $input, $input);
     $stmt->execute();
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'username'  => $user['username'],
                 'email'     => $user['email'],
                 'name'      => $user['first_name'] . ' ' . $user['last_name'],
-                'role'      => 'admin',
+                'role'      => $user['role'],
                 'google_id' => $user['google_id'] ?? null,
             ];
             $conn->close();

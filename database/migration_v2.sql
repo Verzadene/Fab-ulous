@@ -36,8 +36,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- ── 4. Commission fields ──────────────────────────────────────────
--- commissions table already exists; add admin_note if missing
+-- commissions table already exists; add admin-facing fields if missing
 ALTER TABLE commissions
+    ADD COLUMN IF NOT EXISTS commission_name VARCHAR(255) DEFAULT NULL,
     ADD COLUMN IF NOT EXISTS admin_note TEXT DEFAULT NULL;
 
 -- ── To promote an account to super_admin: ────────────────────────
