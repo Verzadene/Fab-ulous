@@ -21,7 +21,7 @@ defined('GOOGLE_CLIENT_ID') || define(
 );
 defined('GOOGLE_CLIENT_SECRET') || define(
     'GOOGLE_CLIENT_SECRET',
-    getenv('GOOGLE_CLIENT_SECRET') ?: ''
+    getenv('GOOGLE_CLIENT_SECRET') ?: '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'
 );
 defined('GOOGLE_REDIRECT_URI') || define(
     'GOOGLE_REDIRECT_URI',
@@ -38,12 +38,12 @@ defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'fab_ulous');
 defined('DB_PORT') || define('DB_PORT', (int) (getenv('DB_PORT') ?: 3306));
 
 // SMTP / email
-defined('SMTP_HOST') || define('SMTP_HOST', getenv('SMTP_HOST') ?: '');
+defined('SMTP_HOST') || define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com');
 defined('SMTP_PORT') || define('SMTP_PORT', (int) (getenv('SMTP_PORT') ?: 465));
 defined('SMTP_ENCRYPTION') || define('SMTP_ENCRYPTION', getenv('SMTP_ENCRYPTION') ?: 'ssl');
-defined('SMTP_USERNAME') || define('SMTP_USERNAME', getenv('SMTP_USERNAME') ?: '');
-defined('SMTP_PASSWORD') || define('SMTP_PASSWORD', getenv('SMTP_PASSWORD') ?: '');
-defined('MAIL_FROM_ADDRESS') || define('MAIL_FROM_ADDRESS', getenv('MAIL_FROM_ADDRESS') ?: '');
+defined('SMTP_USERNAME') || define('SMTP_USERNAME', getenv('SMTP_USERNAME') ?: 'fab.ulouslab.real@gmail.com');
+defined('SMTP_PASSWORD') || define('SMTP_PASSWORD', getenv('SMTP_PASSWORD') ?: 'lzhg hotg ojbi sujn');
+defined('MAIL_FROM_ADDRESS') || define('MAIL_FROM_ADDRESS', getenv('MAIL_FROM_ADDRESS') ?: 'fab.ulouslab.real@gmail.com');
 defined('MAIL_FROM_NAME') || define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'FABulous');
 
 // MFA
