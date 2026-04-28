@@ -21,7 +21,8 @@
   --nav-height: 56px;
   --content-width: 1440px;
   --rail-width: 268px;
-  --font: 'Roboto Condensed', sans-serif;
+  --font: 'Josefin Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
 }
 
 *,
@@ -40,7 +41,7 @@ body {
     radial-gradient(circle at top left, rgba(120, 214, 140, 0.08), transparent 30%),
     linear-gradient(180deg, #24392d 0%, #203328 100%);
   color: var(--text-white);
-  font-family: var(--font);
+  font-family: var(--font-body);
   overflow-x: hidden;
 }
 
