@@ -1,18 +1,9 @@
 <?php
 /**
- * FABulous - centralised configuration.
+ * FABulous - centralised configuration (single source of truth).
  * Include with: require_once __DIR__ . '/../config.php';   (from subdirs)
  *               require_once __DIR__ . '/config.php';       (from root)
- *
- * Do NOT commit real secrets to a public repository.
- * For local development, create config.local.php and define any secrets there.
  */
-
-// Load untracked local overrides first.
-$localConfig = __DIR__ . '/config.local.php';
-if (file_exists($localConfig)) {
-    require $localConfig;
-}
 
 // Google OAuth
 defined('GOOGLE_CLIENT_ID') || define(
@@ -273,7 +264,7 @@ function smtp_normalize_body(string $body): string
 function send_smtp_mail(string $toEmail, string $toName, string $subject, string $body): bool
 {
     if (!smtp_is_configured()) {
-        set_last_mail_error('SMTP is not configured yet. Add your SMTP settings in config.local.php.');
+        set_last_mail_error('SMTP is not configured yet. Add your SMTP settings in config.php.');
         return false;
     }
 
@@ -398,5 +389,17 @@ function send_mfa_code_email(string $email, string $displayName, string $code): 
         . "If you did not request this login, you can ignore this email.\n\n"
         . "FABulous Security";
 
+    return send_smtp_mail($email, $displayName, $subject, $message);
+}
+
+function send_registration_verification_email(string $email, string $displayName, string $code): bool
+{
+    $subject = 'Verify your FABulous account';
+    $message = "Hello {$displayName},\n\n"
+        . "Your FABulous account verification code is: {$code}\n\n"
+        . "This code expires in 60 minutes.\n"
+        . 'Verification page: ' . APP_URL . "/register/verify_registration.php\n\n"
+        . "If you did not request this, you can safely ignore this email.\n\n"
+        . "FABulous Team";
     return send_smtp_mail($email, $displayName, $subject, $message);
 }

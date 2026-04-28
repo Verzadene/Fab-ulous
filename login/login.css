@@ -17,8 +17,8 @@
   --input-border:  #CCCCCC;
   --radius-card:   18px;
   --radius-input:  8px;
-  --font-display:  'Roboto Condensed', sans-serif;
-  --font-body:     'Roboto Condensed', sans-serif;
+  --font-display:  'Josefin Sans', sans-serif;
+  --font-body:     'Inter', sans-serif;
 }
 
 /* ---------- Reset & Base ---------- */

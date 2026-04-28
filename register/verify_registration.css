@@ -1,0 +1,115 @@
+/* ============================================
+   VERIFY_REGISTRATION.CSS — FABulous
+   Email verification page for new registrations
+   (base styles come from register.css)
+   ============================================ */
+
+.verify-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.code-input {
+  width: 100%;
+  height: 52px;
+  text-align: center;
+  font-size: 22px;
+  font-family: 'Josefin Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: 6px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--radius-input);
+  color: var(--text-body);
+  outline: none;
+}
+
+.code-input:focus {
+  border-color: var(--panel-left);
+  box-shadow: 0 0 0 3px rgba(78, 122, 94, .18);
+}
+
+.resend-copy {
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.btn-secondary {
+  width: 100%;
+  height: 44px;
+  background: var(--input-bg);
+  border: 1.5px solid var(--input-border);
+  border-radius: var(--radius-input);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #d4d4d4;
+}
+
+.btn-secondary:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.success-msg {
+  color: #235236;
+  background: rgba(119, 204, 129, .18);
+  border-left: 3px solid #4e7a5e;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.security-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, .18);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .3);
+  width: fit-content;
+}
+
+.verify-copy {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.security-orbs {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.security-orbs span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .35);
+}
+
+.security-orbs span:first-child {
+  background: #fff;
+}
+
+.resend-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}

@@ -12,7 +12,8 @@
   --text-white:   #FFFFFF;
   --text-muted:   rgba(255,255,255,0.55);
   --text-dark:    #1A1A1A;
-  --font:         'Roboto Condensed', sans-serif;
+  --font:         'Josefin Sans', sans-serif;
+  --font-body:    'Inter', sans-serif;
   --sidebar-w:    220px;
   --radius:       14px;
 }
@@ -21,7 +22,7 @@
 
 html, body {
   background: var(--bg);
-  font-family: var(--font);
+  font-family: var(--font-body);
   color: var(--text-white);
   min-height: 100vh;
   overflow-x: hidden;
