@@ -84,8 +84,8 @@ $nameParts = preg_split('/\s+/', $fullName, 2) ?: [];
 $firstName = $nameParts[0] ?? 'Google';
 $lastName = $nameParts[1] ?? 'User';
 
-$check = $conn->prepare('SELECT * FROM accounts WHERE email = ? LIMIT 1');
-$check->bind_param('s', $email);
+$check = $conn->prepare('SELECT * FROM accounts WHERE google_id = ? OR email = ? LIMIT 1');
+$check->bind_param('ss', $googleId, $email);
 $check->execute();
 $existing = $check->get_result()->fetch_assoc();
 $check->close();
@@ -93,7 +93,7 @@ $check->close();
 if (!$existing) {
     prime_google_registration_prefill($email, $fullName, $googleId);
     $conn->close();
-    header('Location: ../register/register.html');
+    header('Location: ../login/login.php?error=google_account_missing');
     exit;
 }
 

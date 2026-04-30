@@ -28,6 +28,7 @@ if (isset($_GET['error'])) {
         'banned' => 'Your account has been suspended. Contact the administrator.',
         'google_oauth_config' => 'Google sign-in is not configured yet. Update config.php with your Google client secret.',
         'oauth_exchange_failed' => 'Google sign-in could not be completed. Please try again.',
+        'google_account_missing' => 'No account exists for this Google email yet. Please register first before logging in with Google.',
         default => '',
     };
 }

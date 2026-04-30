@@ -60,39 +60,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $picUpdated = false;
     $newPicFilename = null;
 
-    if ($hasPicColumn && !empty($_FILES['profile_pic']['name'])) {
+    if (!$hasPicColumn && !empty($_FILES['profile_pic']['name'])) {
+        $errors[] = 'Profile pictures are not enabled yet. Run database/migration_v4.sql first.';
+    } elseif ($hasPicColumn && !empty($_FILES['profile_pic']['name'])) {
         $file = $_FILES['profile_pic'];
         $allowedMimes = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
-        $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($file['tmp_name']);
+        $uploadError = (int) ($file['error'] ?? UPLOAD_ERR_OK);
 
-        if (!isset($allowedMimes[$mime])) {
-            $errors[] = 'Profile picture must be a JPEG or PNG image.';
-        } elseif ($file['size'] > 2 * 1024 * 1024) {
-            $errors[] = 'Profile picture must be smaller than 2 MB.';
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $errors[] = 'The selected profile picture could not be uploaded. Please try again.';
+        } elseif (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            $errors[] = 'The selected profile picture upload is invalid. Please choose the file again.';
         } else {
-            $ext = $allowedMimes[$mime];
-            $uploadDir = __DIR__ . '/../uploads/profile_pics/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            $newPicFilename = $userID . '.' . $ext;
-            $destPath = $uploadDir . $newPicFilename;
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file['tmp_name']);
 
-            // Delete old file if extension changed
-            $oldPic = $user['profile_pic'] ?? '';
-            if ($oldPic && $oldPic !== $newPicFilename) {
-                $oldPath = $uploadDir . $oldPic;
-                if (file_exists($oldPath)) {
-                    @unlink($oldPath);
-                }
-            }
-
-            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                $errors[] = 'Failed to save profile picture. Please try again.';
-                $newPicFilename = null;
+            if (!isset($allowedMimes[$mime])) {
+                $errors[] = 'Profile picture must be a JPEG or PNG image.';
+            } elseif ($file['size'] > 2 * 1024 * 1024) {
+                $errors[] = 'Profile picture must be smaller than 2 MB.';
             } else {
-                $picUpdated = true;
+                $ext = $allowedMimes[$mime];
+                $uploadDir = __DIR__ . '/../uploads/profile_pics/';
+                if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                    $errors[] = 'Could not prepare the profile picture upload folder.';
+                } elseif (!is_writable($uploadDir)) {
+                    $errors[] = 'The profile picture upload folder is not writable.';
+                } else {
+                    $newPicFilename = $userID . '.' . $ext;
+                    $destPath = $uploadDir . $newPicFilename;
+                    $oldPath = null;
+
+                    // Delete old file if extension changed.
+                    $oldPic = $user['profile_pic'] ?? '';
+                    if ($oldPic && $oldPic !== $newPicFilename) {
+                        $oldPath = $uploadDir . $oldPic;
+                    }
+
+                    if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                        $errors[] = 'Failed to save profile picture. Please try again.';
+                        $newPicFilename = null;
+                    } else {
+                        if ($oldPath && file_exists($oldPath)) {
+                            @unlink($oldPath);
+                        }
+                        clearstatcache(true, $destPath);
+                        $picUpdated = true;
+                    }
+                }
             }
         }
     }
@@ -203,7 +218,14 @@ $hasGoogle   = !empty($user['google_id']);
 $memberSince = date('M d, Y', strtotime($user['created_at']));
 
 $profilePic = $user['profile_pic'] ?? null;
-$avatarUrl  = $profilePic ? '../uploads/profile_pics/' . htmlspecialchars($profilePic) : null;
+$avatarVersion = null;
+if ($profilePic) {
+    $avatarPath = __DIR__ . '/../uploads/profile_pics/' . $profilePic;
+    $avatarVersion = file_exists($avatarPath) ? (string) filemtime($avatarPath) : (string) time();
+}
+$avatarUrl  = $profilePic
+    ? '../uploads/profile_pics/' . rawurlencode($profilePic) . '?v=' . rawurlencode((string) $avatarVersion)
+    : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">

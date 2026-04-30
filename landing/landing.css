@@ -10,13 +10,14 @@
   --green-btn-hover: #5db568;
   --text-white:      #FFFFFF;
   --text-muted:      rgba(255, 255, 255, 0.70);
-  --font:            'Roboto Condensed', sans-serif;
+  --font-display:    'Josefin Sans', sans-serif;
+  --font-body:       'Inter', sans-serif;
   --radius-pill:     999px;
 }
 
 html, body {
   background-color: var(--bg) !important;
-  font-family: var(--font) !important;
+  font-family: var(--font-body) !important;
   color: var(--text-white) !important;
   min-height: 100vh;
   width: 100%;
@@ -59,7 +60,7 @@ html, body {
   border-radius: var(--radius-pill) !important;
   background: var(--text-white) !important;
   color: var(--bg) !important;
-  font-family: var(--font) !important;
+  font-family: var(--font-display) !important;
   font-size: 15px;
   font-weight: 700;
   display: inline-flex;
@@ -130,6 +131,7 @@ html, body {
 }
 
 .hero-eyebrow {
+  font-family: var(--font-display);
   font-size: 22px;
   font-weight: 400;
   font-style: italic;
@@ -137,6 +139,7 @@ html, body {
 }
 
 .hero-title {
+  font-family: var(--font-display);
   font-size: clamp(56px, 9vw, 110px);
   font-weight: 800;
   line-height: 0.92;
@@ -163,7 +166,7 @@ html, body {
   border: none !important;
   outline: none;
   padding: 0 24px;
-  font-family: var(--font);
+  font-family: var(--font-body);
   font-size: 16px;
   color: var(--text-white) !important;
 }
@@ -195,7 +198,7 @@ html, body {
   border: 2px solid var(--green-btn) !important;
   border-radius: var(--radius-pill) !important;
   color: var(--text-white) !important;
-  font-family: var(--font) !important;
+  font-family: var(--font-display) !important;
   font-size: 15px;
   font-weight: 700;
   display: inline-flex;
@@ -218,7 +221,7 @@ html, body {
   border: 2px solid var(--text-white) !important;
   border-radius: var(--radius-pill) !important;
   color: var(--text-white) !important;
-  font-family: var(--font) !important;
+  font-family: var(--font-display) !important;
   font-size: 15px;
   font-weight: 700;
   display: inline-flex;
@@ -252,6 +255,7 @@ html, body {
 }
 
 .hero-tagline {
+  font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 46px);
   font-weight: 800;
   line-height: 1.1;
@@ -260,6 +264,7 @@ html, body {
 }
 
 .hero-desc {
+  font-family: var(--font-body);
   font-size: 16px;
   font-weight: 500;
   line-height: 1.65;
@@ -284,6 +289,7 @@ html, body {
 }
 
 .contact-heading {
+  font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 800;
   color: var(--text-white);
@@ -291,6 +297,7 @@ html, body {
 }
 
 .contact-sub {
+  font-family: var(--font-body);
   font-size: 15px;
   color: var(--text-muted);
   max-width: 560px;
@@ -328,6 +335,7 @@ html, body {
 }
 
 .contact-label {
+  font-family: var(--font-display);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -337,6 +345,7 @@ html, body {
 }
 
 .contact-value {
+  font-family: var(--font-body);
   font-size: 15px;
   font-weight: 600;
   color: var(--text-white);
@@ -344,6 +353,7 @@ html, body {
 }
 
 .contact-copy {
+  font-family: var(--font-body);
   font-size: 13px;
   color: var(--text-muted);
   margin-top: 8px;

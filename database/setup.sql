@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     email       VARCHAR(150) UNIQUE NOT NULL,
     password    VARCHAR(255),
     google_id   VARCHAR(100),
+    profile_pic VARCHAR(100) DEFAULT NULL,
     role        ENUM('user','admin','super_admin') DEFAULT 'user',
     banned      TINYINT(1)   DEFAULT 0,
     created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP

@@ -5,6 +5,11 @@
  *               require_once __DIR__ . '/config.php';       (from root)
  */
 
+$localConfig = __DIR__ . '/config.local.php';
+if (is_file($localConfig)) {
+    require_once $localConfig;
+}
+
 // Google OAuth
 defined('GOOGLE_CLIENT_ID') || define(
     'GOOGLE_CLIENT_ID',
