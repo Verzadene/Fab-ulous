@@ -43,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'last_name' => $user['last_name'],
                         'role' => $user['role'],
                         'google_id' => $user['google_id'] ?? null,
+                        'profile_pic' => $user['profile_pic'] ?? null,
                     ];
                     $_SESSION['pending_mfa_sent_at'] = time();
 

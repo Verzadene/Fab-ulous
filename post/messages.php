@@ -20,45 +20,64 @@ $role = $_SESSION['user']['role'] ?? 'user';
 $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 
 $hasMessagesTable = (bool) $conn->query("SHOW TABLES LIKE 'messages'")->num_rows;
-$friends = [];
-$selectedFriendId = (int) ($_GET['friend'] ?? 0);
+$hasFriendships   = (bool) $conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
+$selectedPersonId = (int) ($_GET['friend'] ?? 0);
+$myProfilePic     = $_SESSION['user']['profile_pic'] ?? null;
+$myAvatarUrl      = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
 
-$friendStmt = $conn->prepare(
-    "SELECT id, name, username FROM (
-        SELECT a.id,
-               CONCAT(a.first_name, ' ', a.last_name) AS name,
-               a.username
-        FROM friendships f
-        JOIN accounts a ON a.id = f.receiverID
-        WHERE f.requesterID = ? AND f.status = 'accepted'
+// All non-banned accounts except self, with friendship status when available
+if ($hasFriendships) {
+    $contStmt = $conn->prepare(
+        "SELECT a.id,
+                CONCAT(a.first_name, ' ', a.last_name) AS name,
+                a.username,
+                a.profile_pic,
+                COALESCE((
+                    SELECT status FROM friendships
+                    WHERE (requesterID = ? AND receiverID = a.id)
+                       OR (receiverID = ? AND requesterID = a.id)
+                    LIMIT 1
+                ), 'none') AS friend_status
+         FROM accounts a
+         WHERE a.id != ? AND a.banned = 0
+         ORDER BY
+             CASE WHEN EXISTS(
+                 SELECT 1 FROM friendships
+                 WHERE status = 'accepted'
+                   AND ((requesterID = ? AND receiverID = a.id)
+                     OR (receiverID = ? AND requesterID = a.id))
+             ) THEN 0 ELSE 1 END,
+             a.username ASC"
+    );
+    $contStmt->bind_param('iiiii', $userId, $userId, $userId, $userId, $userId);
+} else {
+    $contStmt = $conn->prepare(
+        "SELECT a.id,
+                CONCAT(a.first_name, ' ', a.last_name) AS name,
+                a.username,
+                a.profile_pic,
+                'none' AS friend_status
+         FROM accounts a
+         WHERE a.id != ? AND a.banned = 0
+         ORDER BY a.username ASC"
+    );
+    $contStmt->bind_param('i', $userId);
+}
+$contStmt->execute();
+$contacts = $contStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$contStmt->close();
 
-        UNION
-
-        SELECT a.id,
-               CONCAT(a.first_name, ' ', a.last_name) AS name,
-               a.username
-        FROM friendships f
-        JOIN accounts a ON a.id = f.requesterID
-        WHERE f.receiverID = ? AND f.status = 'accepted'
-    ) AS accepted_friends
-    ORDER BY name ASC"
-);
-$friendStmt->bind_param('ii', $userId, $userId);
-$friendStmt->execute();
-$friends = $friendStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$friendStmt->close();
-
-$selectedFriend = null;
-foreach ($friends as $friend) {
-    if ($selectedFriendId === (int) $friend['id']) {
-        $selectedFriend = $friend;
+$selectedContact = null;
+foreach ($contacts as $contact) {
+    if ($selectedPersonId === (int) $contact['id']) {
+        $selectedContact = $contact;
         break;
     }
 }
 
-if (!$selectedFriend && !empty($friends)) {
-    $selectedFriend = $friends[0];
-    $selectedFriendId = (int) $selectedFriend['id'];
+if (!$selectedContact && !empty($contacts)) {
+    $selectedContact = $contacts[0];
+    $selectedPersonId = (int) $selectedContact['id'];
 }
 
 $conn->close();
@@ -79,10 +98,14 @@ $conn->close();
   <nav class="nav-drawer" id="navDrawer" aria-label="Quick navigation">
     <div class="drawer-profile">
       <div class="drawer-avatar">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
-          <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
-          <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
-        </svg>
+        <?php if ($myAvatarUrl): ?>
+          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile"/>
+        <?php else: ?>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
+            <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
+            <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
+          </svg>
+        <?php endif; ?>
       </div>
       <p class="drawer-name"><?php echo htmlspecialchars($name); ?></p>
       <p class="drawer-username">@<?php echo htmlspecialchars($username); ?></p>
@@ -129,35 +152,49 @@ $conn->close();
             <p class="side-card-kicker">Community</p>
             <h2 class="messages-title">Messages</h2>
           </div>
-          <span class="messages-count"><?php echo count($friends); ?></span>
+          <span class="messages-count"><?php echo count($contacts); ?></span>
         </div>
-        <p class="messages-subtitle">Accepted friends are ready for direct chat.</p>
+        <p class="messages-subtitle">Message anyone on FABulous. Friends are listed first.</p>
 
         <label class="friend-search-shell messages-search-shell" for="friendFilter">
           <span class="friend-search-icon">&#128269;</span>
-          <input id="friendFilter" class="friend-search-input" type="search" placeholder="Filter friends" autocomplete="off"/>
+          <input id="friendFilter" class="friend-search-input" type="search" placeholder="Filter people" autocomplete="off"/>
         </label>
 
         <div class="message-friend-list" id="friendList">
-          <?php if (empty($friends)): ?>
+          <?php if (empty($contacts)): ?>
             <div class="messages-empty">
-              <strong>No friends yet</strong>
-              <span>Accept or send a friend request from the feed to start messaging.</span>
+              <strong>No accounts found</strong>
+              <span>There are no other registered accounts yet.</span>
             </div>
           <?php else: ?>
-            <?php foreach ($friends as $friend): ?>
+            <?php foreach ($contacts as $contact): ?>
+              <?php
+                $contactPic = !empty($contact['profile_pic'])
+                    ? '../uploads/profile_pics/' . rawurlencode($contact['profile_pic'])
+                    : null;
+                $isFriend = ($contact['friend_status'] ?? 'none') === 'accepted';
+              ?>
               <a
-                href="?friend=<?php echo (int) $friend['id']; ?>"
-                class="message-friend-row<?php echo $selectedFriendId === (int) $friend['id'] ? ' active' : ''; ?>"
-                data-name="<?php echo htmlspecialchars(strtolower($friend['name'])); ?>"
-                data-username="<?php echo htmlspecialchars(strtolower($friend['username'])); ?>"
+                href="?friend=<?php echo (int) $contact['id']; ?>"
+                class="message-friend-row<?php echo $selectedPersonId === (int) $contact['id'] ? ' active' : ''; ?>"
+                data-name="<?php echo htmlspecialchars(strtolower($contact['name'])); ?>"
+                data-username="<?php echo htmlspecialchars(strtolower($contact['username'])); ?>"
               >
                 <span class="message-friend-avatar">
-                  <?php echo htmlspecialchars(strtoupper(substr($friend['username'], 0, 1))); ?>
+                  <?php if ($contactPic): ?>
+                    <img src="<?php echo htmlspecialchars($contactPic); ?>" class="msg-contact-img" alt=""/>
+                  <?php else: ?>
+                    <?php echo htmlspecialchars(strtoupper(substr($contact['username'], 0, 1))); ?>
+                  <?php endif; ?>
                 </span>
                 <span class="message-friend-copy">
-                  <strong><?php echo htmlspecialchars($friend['name']); ?></strong>
-                  <small>@<?php echo htmlspecialchars($friend['username']); ?></small>
+                  <strong><?php echo htmlspecialchars($contact['name']); ?></strong>
+                  <small>@<?php echo htmlspecialchars($contact['username']); ?>
+                    <?php if ($isFriend): ?>
+                      <span class="msg-friend-tag">&#10003; Friend</span>
+                    <?php endif; ?>
+                  </small>
                 </span>
               </a>
             <?php endforeach; ?>
@@ -169,25 +206,37 @@ $conn->close();
         <?php if (!$hasMessagesTable): ?>
           <div class="messages-empty messages-unavailable">
             <strong>Messages are not available yet</strong>
-            <span>The code is ready, but your database still needs a compatible <code>messages</code> table.</span>
+            <span>The code is ready, but your database still needs a compatible <code>messages</code> table. Run <code>migration_v5.sql</code>.</span>
           </div>
-        <?php elseif (!$selectedFriend): ?>
+        <?php elseif (!$selectedContact): ?>
           <div class="messages-empty">
-            <strong>Select a friend</strong>
-            <span>Choose a friend from the left panel to open your conversation.</span>
+            <strong>Select someone to message</strong>
+            <span>Choose any account from the left panel to start a conversation.</span>
           </div>
         <?php else: ?>
+          <?php
+            $selPic = !empty($selectedContact['profile_pic'])
+                ? '../uploads/profile_pics/' . rawurlencode($selectedContact['profile_pic'])
+                : null;
+            $selIsFriend = ($selectedContact['friend_status'] ?? 'none') === 'accepted';
+          ?>
           <div class="thread-head">
             <div class="thread-person">
               <span class="message-friend-avatar large">
-                <?php echo htmlspecialchars(strtoupper(substr($selectedFriend['username'], 0, 1))); ?>
+                <?php if ($selPic): ?>
+                  <img src="<?php echo htmlspecialchars($selPic); ?>" class="msg-contact-img large" alt=""/>
+                <?php else: ?>
+                  <?php echo htmlspecialchars(strtoupper(substr($selectedContact['username'], 0, 1))); ?>
+                <?php endif; ?>
               </span>
               <div>
-                <h3><?php echo htmlspecialchars($selectedFriend['name']); ?></h3>
-                <p>@<?php echo htmlspecialchars($selectedFriend['username']); ?></p>
+                <h3><?php echo htmlspecialchars($selectedContact['name']); ?></h3>
+                <p>@<?php echo htmlspecialchars($selectedContact['username']); ?></p>
               </div>
             </div>
-            <span class="thread-badge">Accepted connection</span>
+            <span class="thread-badge">
+              <?php echo $selIsFriend ? '&#10003; Friend' : 'Not a friend'; ?>
+            </span>
           </div>
 
           <div class="thread-stream" id="threadStream">
@@ -221,7 +270,7 @@ $conn->close();
     const threadStream = document.getElementById('threadStream');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
-    const selectedFriendId = <?php echo (int) $selectedFriendId; ?>;
+    const selectedFriendId = <?php echo (int) $selectedPersonId; ?>;
     const messagesReady = <?php echo $hasMessagesTable ? 'true' : 'false'; ?>;
     let pollHandle = null;
 

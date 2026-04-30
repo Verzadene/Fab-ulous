@@ -79,6 +79,7 @@ function begin_user_session(array $user, bool $mfaVerified = true, string $authM
         'name' => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
         'role' => $user['role'] ?? 'user',
         'google_id' => $user['google_id'] ?? null,
+        'profile_pic' => $user['profile_pic'] ?? null,
         'auth_method' => $authMethod,
     ];
     $_SESSION['mfa_verified'] = $mfaVerified;

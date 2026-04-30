@@ -22,6 +22,12 @@ if (isset($_GET['google'])) {
 
 $conn = db_connect();
 $error = '';
+$errorIsHtml = false;
+
+$loginSuccess = '';
+if (isset($_GET['reset']) && $_GET['reset'] === '1') {
+    $loginSuccess = 'Password updated successfully. You can now sign in with your new password.';
+}
 
 if (isset($_GET['error'])) {
     $error = match ($_GET['error']) {
@@ -44,7 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->close();
 
     if ($user && !empty($user['password']) && password_verify($password, $user['password'])) {
-        if ($user['banned']) {
+        if (in_array($user['role'] ?? '', ['admin', 'super_admin'], true)) {
+            $error = 'Admin accounts must sign in at the <a href="../admin/admin_login.php" class="link-btn">Admin Portal</a>.';
+            $errorIsHtml = true;
+        } elseif ($user['banned']) {
             $error = 'Your account has been suspended. Contact the administrator.';
         } else {
             if (!accounts_support_mfa($conn)) {
@@ -66,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'last_name' => $user['last_name'],
                         'role' => $user['role'] ?? 'user',
                         'google_id' => $user['google_id'] ?? null,
+                        'profile_pic' => $user['profile_pic'] ?? null,
                     ];
                     $_SESSION['pending_mfa_sent_at'] = time();
 
@@ -139,8 +149,12 @@ $conn->close();
     <div class="right-panel">
       <h2 class="panel-title">Welcome!</h2>
 
+      <?php if ($loginSuccess): ?>
+        <p class="success-msg"><?php echo htmlspecialchars($loginSuccess); ?></p>
+      <?php endif; ?>
+
       <?php if ($error): ?>
-        <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
+        <p class="error-msg"><?php echo $errorIsHtml ? $error : htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
       <form method="POST" action="">
@@ -178,7 +192,7 @@ $conn->close();
         <span class="bottom-text">No Account?
           <a href="../register/register.html" class="link-btn">Register Now!</a>
         </span>
-        <a href="#" class="link-btn">Forgot Password?</a>
+        <a href="forgot_password.php" class="link-btn">Forgot Password?</a>
       </div>
     </div>
   </main>

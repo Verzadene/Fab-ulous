@@ -594,6 +594,43 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   flex-shrink: 0;
 }
 
+.post-avatar-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.drawer-avatar-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.post-own-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.post-own-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.55);
+  font-size: 14px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.post-own-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.post-own-btn.post-own-delete:hover { background: rgba(231,76,60,0.18); color: #ff8a8a; border-color: rgba(231,76,60,0.4); }
+
 .post-meta {
   display: flex;
   flex-direction: column;

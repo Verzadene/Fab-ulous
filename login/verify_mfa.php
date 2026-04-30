@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
     } else {
         $submittedCode = trim($_POST['verification_code'] ?? '');
         $stmt = $conn->prepare(
-            'SELECT id, first_name, last_name, username, email, role, google_id, mfa_code, mfa_code_expires_at
+            'SELECT id, first_name, last_name, username, email, role, google_id, profile_pic, mfa_code, mfa_code_expires_at
              FROM accounts
              WHERE id = ?
              LIMIT 1'

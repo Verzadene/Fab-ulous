@@ -356,7 +356,9 @@ html, body {
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--text-muted);
-  margin-top: 8px;
+  margin-top: 16px;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 /* ============================================

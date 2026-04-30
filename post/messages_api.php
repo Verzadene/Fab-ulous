@@ -82,11 +82,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    if (!is_accepted_friend($conn, $userId, $friendId)) {
+    // Verify target account exists and is not banned
+    $chk = $conn->prepare("SELECT id FROM accounts WHERE id = ? AND banned = 0 LIMIT 1");
+    $chk->bind_param('i', $friendId);
+    $chk->execute();
+    $chk->store_result();
+    if ($chk->num_rows === 0) {
+        $chk->close();
         $conn->close();
-        echo json_encode(['success' => false, 'error' => 'You can only message accepted friends.']);
+        echo json_encode(['success' => false, 'error' => 'That account does not exist.']);
         exit;
     }
+    $chk->close();
 
     $messageColumn = $schema['message_column'];
     $timeColumn = $schema['time_column'];
@@ -134,11 +141,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    if (!is_accepted_friend($conn, $userId, $friendId)) {
+    // Verify target account exists and is not banned
+    $chk = $conn->prepare("SELECT id FROM accounts WHERE id = ? AND banned = 0 LIMIT 1");
+    $chk->bind_param('i', $friendId);
+    $chk->execute();
+    $chk->store_result();
+    if ($chk->num_rows === 0) {
+        $chk->close();
         $conn->close();
-        echo json_encode(['success' => false, 'error' => 'You can only message accepted friends.']);
+        echo json_encode(['success' => false, 'error' => 'That account does not exist.']);
         exit;
     }
+    $chk->close();
 
     $message = mb_substr($message, 0, 1000);
     $messageColumn = $schema['message_column'];

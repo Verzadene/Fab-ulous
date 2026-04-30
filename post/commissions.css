@@ -166,6 +166,109 @@
   color: #e74c3c;
 }
 
+.status-badge.status-accepted {
+  background: rgba(46,204,113,0.18);
+  color: #2ecc71;
+}
+
+.status-badge.status-ongoing {
+  background: rgba(52,152,219,0.18);
+  color: #5dade2;
+}
+
+.status-badge.status-delayed {
+  background: rgba(230,126,34,0.18);
+  color: #e67e22;
+}
+
+/* Commission submission form */
+.commission-submit-card {
+  padding: 24px 26px;
+}
+
+.commission-submit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.commission-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.commission-label {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.commission-optional {
+  font-weight: 400;
+  color: #7a9280;
+  font-size: 12px;
+}
+
+.commission-required {
+  color: #e74c3c;
+}
+
+.commission-input,
+.commission-textarea {
+  background: rgba(255,255,255,0.05);
+  border: 1.5px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--text-dark);
+  font-family: var(--font-body);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.commission-input:focus,
+.commission-textarea:focus {
+  outline: none;
+  border-color: rgba(119,204,129,0.5);
+}
+
+.commission-file-input {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-dark);
+}
+
+.commission-file-link {
+  color: #77cc81;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.commission-file-link:hover { text-decoration: underline; }
+
+/* Page-level messages */
+.commission-page-msg {
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.commission-msg-ok {
+  background: rgba(46,204,113,0.14);
+  color: #2ecc71;
+  border: 1px solid rgba(46,204,113,0.25);
+}
+
+.commission-msg-error {
+  background: rgba(231,76,60,0.12);
+  color: #ff8a8a;
+  border: 1px solid rgba(231,76,60,0.25);
+}
+
 .messages-empty {
   min-height: 180px;
   display: flex;

@@ -13,7 +13,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified']) || !in_array($r
 $commissionId = (int) ($_POST['target_id'] ?? 0);
 $status = trim($_POST['commission_status'] ?? '');
 $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
-$allowedStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+$allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
 
 if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
     echo json_encode(['success' => false, 'error' => 'Invalid commission update.']);
@@ -31,8 +31,8 @@ if ($success) {
     $adminUsername = $_SESSION['user']['username'];
     $action = "Updated commission #{$commissionId} to {$status}";
     $log = $conn->prepare(
-        "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id)
-         VALUES (?, ?, ?, 'commission', ?)"
+        "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
+         VALUES (?, ?, ?, 'commission', ?, 'admin')"
     );
     if ($log) {
         $log->bind_param('issi', $adminId, $adminUsername, $action, $commissionId);

@@ -107,6 +107,27 @@
   font-size: 18px;
 }
 
+.msg-contact-img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.msg-contact-img.large {
+  width: 52px;
+  height: 52px;
+}
+
+.msg-friend-tag {
+  display: inline-block;
+  margin-left: 4px;
+  color: #4E7A5E;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .message-friend-copy {
   display: flex;
   flex-direction: column;

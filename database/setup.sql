@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS commissions (
     commission_name VARCHAR(255) DEFAULT NULL,
     stl_file_url    VARCHAR(500),
     description     TEXT,
-    status          ENUM('Pending','In Progress','Completed','Cancelled') DEFAULT 'Pending',
+    status          ENUM('Pending','Accepted','Ongoing','Delayed','Completed','Cancelled') DEFAULT 'Pending',
     amount          DECIMAL(10,2) DEFAULT 0.00,
     admin_note      TEXT DEFAULT NULL,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -89,13 +89,35 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE TABLE IF NOT EXISTS audit_log (
-    logID          INT AUTO_INCREMENT PRIMARY KEY,
-    admin_id       INT NOT NULL,
-    admin_username VARCHAR(50) NOT NULL,
-    action         VARCHAR(255) NOT NULL,
-    target_type    VARCHAR(50),
-    target_id      INT,
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    logID           INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id        INT NOT NULL,
+    admin_username  VARCHAR(50) NOT NULL,
+    action          VARCHAR(255) NOT NULL,
+    target_type     VARCHAR(50),
+    target_id       INT,
+    visibility_role ENUM('admin','super_admin') DEFAULT 'admin',
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    email       VARCHAR(150) NOT NULL,
+    reset_code  VARCHAR(10)  NOT NULL,
+    expires_at  TIMESTAMP    NOT NULL,
+    used        TINYINT(1)   DEFAULT 0,
+    created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_password_resets_email (email)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    messageID    INT AUTO_INCREMENT PRIMARY KEY,
+    senderID     INT NOT NULL,
+    receiverID   INT NOT NULL,
+    message_text TEXT NOT NULL,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_messages_thread (senderID, receiverID),
+    FOREIGN KEY (senderID)   REFERENCES accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiverID) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
 -- To promote an existing account to admin, run:

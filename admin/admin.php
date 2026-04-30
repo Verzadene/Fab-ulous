@@ -27,16 +27,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $targetID = (int)($_POST['target_id'] ?? 0);
 
     if ($action === 'ban_user' && $targetID) {
-        // super_admin can ban anyone except other super_admins; admin can ban only users
         $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
         $upd = $conn->prepare("UPDATE accounts SET banned = 1 WHERE id = ? AND role IN $allowedRoles AND id != ?");
         $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
+        $sel = $conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         $logAction = "Banned user: " . ($row['username'] ?? 'Unknown');
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
-        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $vis = ($row['role'] ?? 'user') === 'user' ? 'admin' : 'super_admin';
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
+        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
         $actionMsg = "User banned.";
     }
@@ -45,12 +45,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
         $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ? AND role IN $allowedRoles");
         $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
+        $sel = $conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         $logAction = "Unbanned user: " . ($row['username'] ?? 'Unknown');
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
-        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $vis = ($row['role'] ?? 'user') === 'user' ? 'admin' : 'super_admin';
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
+        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
         $actionMsg = "User unbanned.";
     }
@@ -58,9 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'delete_post' && $targetID) {
         $del = $conn->prepare("DELETE FROM posts WHERE postID = ?");
         $del->bind_param("i", $targetID); $del->execute(); $del->close();
-        $logAction = "Removed post #$targetID";
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'post',?)");
-        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $logAction = "Admin removed post #$targetID";
+        $vis = 'admin';
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'post',?,?)");
+        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
         $actionMsg = "Post removed.";
     }
@@ -73,8 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         $logAction = "Promoted to admin: " . ($row['username'] ?? 'Unknown');
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
-        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $vis = 'super_admin';
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
+        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
         $actionMsg = "User promoted to admin.";
     }
@@ -87,8 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         $logAction = "Demoted to user: " . ($row['username'] ?? 'Unknown');
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id) VALUES (?,?,?,'user',?)");
-        $log->bind_param("issi", $adminID, $adminUsername, $logAction, $targetID);
+        $vis = 'super_admin';
+        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
+        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
         $actionMsg = "Admin demoted to user.";
     }
@@ -97,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'update_commission' && $targetID) {
         $newStatus = $_POST['commission_status'] ?? '';
         $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
-        $allowedStatuses = ['Pending', 'In Progress', 'Completed', 'Cancelled'];
+        $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
         if (in_array($newStatus, $allowedStatuses, true)) {
             $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ? WHERE commissionID = ?");
             if ($upd) {
@@ -127,13 +131,14 @@ $revRow = $conn->query("SELECT COALESCE(SUM(amount),0) AS t FROM commissions WHE
 $revenueSales = number_format((float)$revRow['t'], 2);
 
 // ── Order Pipeline ───────────────────────────────────────────────
-$pipeline = ['Pending' => 0, 'In Progress' => 0, 'Completed' => 0, 'Cancelled' => 0];
+$pipeline = ['Pending' => 0, 'Accepted' => 0, 'Ongoing' => 0, 'Delayed' => 0, 'Completed' => 0, 'Cancelled' => 0];
 $pRes = $conn->query("SELECT status, COUNT(*) AS c FROM commissions GROUP BY status");
-if ($pRes) while ($r = $pRes->fetch_assoc()) $pipeline[$r['status']] = (int)$r['c'];
+if ($pRes) while ($r = $pRes->fetch_assoc()) { if (array_key_exists($r['status'], $pipeline)) $pipeline[$r['status']] = (int)$r['c']; }
 
-// ── Live Audit Log ───────────────────────────────────────────────
+// ── Live Audit Log (visibility-filtered) ────────────────────────
 $auditLogs = [];
-$aRes = $conn->query("SELECT admin_username, action, created_at FROM audit_log ORDER BY created_at DESC LIMIT 8");
+$auditFilter = $isSuperAdmin ? '' : "WHERE visibility_role = 'admin'";
+$aRes = $conn->query("SELECT admin_username, action, created_at FROM audit_log {$auditFilter} ORDER BY created_at DESC LIMIT 8");
 if ($aRes) while ($r = $aRes->fetch_assoc()) $auditLogs[] = $r;
 
 // ── User List ────────────────────────────────────────────────────
@@ -284,7 +289,9 @@ $conn->close();
           <canvas id="pipelineChart" width="190" height="190"></canvas>
           <div class="pipeline-legend">
             <span><span class="legend-dot pending"></span>Pending: <?php echo $pipeline['Pending']; ?></span>
-            <span><span class="legend-dot inprogress"></span>In Progress: <?php echo $pipeline['In Progress']; ?></span>
+            <span><span class="legend-dot accepted"></span>Accepted: <?php echo $pipeline['Accepted']; ?></span>
+            <span><span class="legend-dot ongoing"></span>Ongoing: <?php echo $pipeline['Ongoing']; ?></span>
+            <span><span class="legend-dot delayed"></span>Delayed: <?php echo $pipeline['Delayed']; ?></span>
             <span><span class="legend-dot completed"></span>Completed: <?php echo $pipeline['Completed']; ?></span>
             <span><span class="legend-dot cancelled"></span>Cancelled: <?php echo $pipeline['Cancelled']; ?></span>
           </div>
@@ -392,7 +399,7 @@ $conn->close();
                       <input type="hidden" name="action"    value="delete_post"/>
                       <input type="hidden" name="target_id" value="<?php echo $p['postID']; ?>"/>
                       <button type="submit" class="action-btn btn-ban"
-                              onclick="return confirm('Remove this post permanently?')">Remove</button>
+                              onclick="return confirmDeletePost(this, <?php echo (int)$p['postID']; ?>, <?php echo htmlspecialchars(json_encode(mb_substr($p['caption'] ?? '', 0, 200)), ENT_QUOTES); ?>)">Remove</button>
                     </form>
                   </td>
                 </tr>
@@ -442,7 +449,7 @@ $conn->close();
                       <input type="hidden" name="action"    value="update_commission"/>
                       <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
                       <select name="commission_status" class="commission-select">
-                        <?php foreach (['Pending','In Progress','Completed','Cancelled'] as $s): ?>
+                        <?php foreach (['Pending','Accepted','Ongoing','Delayed','Completed','Cancelled'] as $s): ?>
                           <option value="<?php echo $s; ?>" <?php echo $c['status'] === $s ? 'selected' : ''; ?>><?php echo $s; ?></option>
                         <?php endforeach; ?>
                       </select>
@@ -464,6 +471,11 @@ $conn->close();
 </div>
 
 <script>
+function confirmDeletePost(btn, postId, caption) {
+  const preview = caption ? '\n\nCaption preview:\n"' + caption.substring(0, 120) + (caption.length > 120 ? '…' : '') + '"' : '';
+  return confirm('Remove post #' + postId + ' permanently?' + preview);
+}
+
 function switchTab(name, btn) {
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
@@ -536,15 +548,17 @@ document.querySelectorAll('.commission-form').forEach(form => {
 new Chart(document.getElementById('pipelineChart').getContext('2d'), {
   type: 'doughnut',
   data: {
-    labels: ['Pending','In Progress','Completed','Cancelled'],
+    labels: ['Pending','Accepted','Ongoing','Delayed','Completed','Cancelled'],
     datasets: [{
       data: [
         <?php echo $pipeline['Pending']; ?>,
-        <?php echo $pipeline['In Progress']; ?>,
+        <?php echo $pipeline['Accepted']; ?>,
+        <?php echo $pipeline['Ongoing']; ?>,
+        <?php echo $pipeline['Delayed']; ?>,
         <?php echo $pipeline['Completed']; ?>,
         <?php echo $pipeline['Cancelled']; ?>
       ],
-      backgroundColor: ['#f39c12','#3498db','#2ecc71','#e74c3c'],
+      backgroundColor: ['#f39c12','#2ecc71','#3498db','#e67e22','#27ae60','#e74c3c'],
       borderWidth: 0,
       hoverOffset: 8
     }]

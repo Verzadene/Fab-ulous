@@ -22,11 +22,13 @@ $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 
 $hasFriendships = (bool)$conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
 $hasNotifs = (bool)$conn->query("SHOW TABLES LIKE 'notifications'")->num_rows;
+$myProfilePic = $_SESSION['user']['profile_pic'] ?? null;
+$myAvatarUrl = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
 
 if ($hasFriendships) {
     $feedStmt = $conn->prepare("
         SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author,
+               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
                (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
                (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
                EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked
@@ -49,7 +51,7 @@ if ($hasFriendships) {
 
     $discStmt = $conn->prepare("
         SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author,
+               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
                (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
                (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
                EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked,
@@ -98,7 +100,7 @@ if ($hasFriendships) {
 } else {
     $feedStmt = $conn->prepare("
         SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author,
+               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
                (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
                (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
                EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked
@@ -191,10 +193,14 @@ $conn->close();
   <nav class="nav-drawer" id="navDrawer" aria-label="Quick navigation">
     <div class="drawer-profile">
       <div class="drawer-avatar">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
-          <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
-          <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
-        </svg>
+        <?php if ($myAvatarUrl): ?>
+          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile"/>
+        <?php else: ?>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
+            <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
+            <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
+          </svg>
+        <?php endif; ?>
       </div>
       <p class="drawer-name"><?php echo htmlspecialchars($name); ?></p>
       <p class="drawer-username">@<?php echo htmlspecialchars($username); ?></p>
@@ -293,18 +299,29 @@ $conn->close();
           </div>
         <?php else: ?>
           <?php foreach ($posts as $post): ?>
+            <?php $isOwnPost = ((int)$post['authorID'] === $userID); ?>
             <div class="post-card" id="post-<?php echo $post['postID']; ?>">
               <div class="post-header">
                 <div class="post-avatar">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
-                    <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
-                    <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
-                  </svg>
+                  <?php if (!empty($post['author_pic'])): ?>
+                    <img src="../uploads/profile_pics/<?php echo rawurlencode($post['author_pic']); ?>" class="post-avatar-img" alt=""/>
+                  <?php else: ?>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
+                      <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
+                      <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
+                    </svg>
+                  <?php endif; ?>
                 </div>
                 <div class="post-meta">
                   <span class="post-author"><?php echo htmlspecialchars($post['author']); ?></span>
                   <span class="post-time"><?php echo date('M d, Y \a\t H:i', strtotime($post['created_at'])); ?></span>
                 </div>
+                <?php if ($isOwnPost): ?>
+                  <div class="post-own-actions">
+                    <button class="post-own-btn" onclick="openEditPost(<?php echo $post['postID']; ?>, <?php echo htmlspecialchars(json_encode($post['caption']), ENT_QUOTES); ?>)" title="Edit">&#9998;</button>
+                    <button class="post-own-btn post-own-delete" onclick="deletePost(<?php echo $post['postID']; ?>)" title="Delete">&#128465;</button>
+                  </div>
+                <?php endif; ?>
               </div>
 
               <?php if (!empty($post['caption'])): ?>
@@ -339,7 +356,7 @@ $conn->close();
 
         <?php if (!empty($discoverPosts)): ?>
           <div class="discover-heading">
-            <span>&#127760; Discover People</span>
+            <span>Discover People</span>
           </div>
           <?php foreach ($discoverPosts as $post): ?>
             <?php
@@ -351,10 +368,14 @@ $conn->close();
             <div class="post-card discover-card" id="post-<?php echo $post['postID']; ?>">
               <div class="post-header">
                 <div class="post-avatar">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
-                    <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
-                    <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
-                  </svg>
+                  <?php if (!empty($post['author_pic'])): ?>
+                    <img src="../uploads/profile_pics/<?php echo rawurlencode($post['author_pic']); ?>" class="post-avatar-img" alt=""/>
+                  <?php else: ?>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
+                      <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
+                      <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
+                    </svg>
+                  <?php endif; ?>
                 </div>
                 <div class="post-meta">
                   <span class="post-author"><?php echo htmlspecialchars($post['author']); ?></span>
@@ -463,6 +484,24 @@ $conn->close();
       </aside>
     </div>
   </div>
+
+<!-- Edit Post Modal -->
+<div id="editPostModal" class="modal-overlay" onclick="closeEditModalOutside(event)" style="display:none;">
+  <div class="modal-card" style="max-width:520px;">
+    <button class="modal-close" onclick="closeEditPost()">&times;</button>
+    <div class="modal-body" style="flex-direction:column;gap:16px;">
+      <h2 class="modal-title">Edit Post</h2>
+      <form id="editPostForm" onsubmit="submitEditPost(event)">
+        <input type="hidden" id="editPostId" name="post_id"/>
+        <textarea id="editPostCaption" name="caption" class="caption-input" rows="6" maxlength="2000" required></textarea>
+        <div class="modal-actions" style="margin-top:12px;">
+          <button type="button" class="modal-btn-discard" onclick="closeEditPost()">Cancel</button>
+          <button type="submit" class="modal-btn-upload">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script>
 const burgerBtn = document.getElementById('burgerBtn');
@@ -947,6 +986,69 @@ friendSearchInput?.addEventListener('input', renderFriendsPanel);
 renderFriendsPanel();
 loadNotifications();
 setInterval(loadNotifications, 60000);
+
+function openEditPost(postId, caption) {
+  document.getElementById('editPostId').value = postId;
+  document.getElementById('editPostCaption').value = caption;
+  document.getElementById('editPostModal').style.display = 'flex';
+}
+
+function closeEditPost() {
+  document.getElementById('editPostModal').style.display = 'none';
+}
+
+function closeEditModalOutside(event) {
+  if (event.target.id === 'editPostModal') closeEditPost();
+}
+
+async function submitEditPost(event) {
+  event.preventDefault();
+  const postId = document.getElementById('editPostId').value;
+  const caption = document.getElementById('editPostCaption').value.trim();
+  if (!caption) return;
+
+  try {
+    const response = await fetch('edit_post.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'post_id=' + encodeURIComponent(postId) + '&caption=' + encodeURIComponent(caption)
+    });
+    const data = await response.json();
+    if (data.success) {
+      const card = document.getElementById('post-' + postId);
+      if (card) {
+        const captionEl = card.querySelector('.post-caption');
+        if (captionEl) captionEl.innerHTML = esc(caption).replace(/\n/g, '<br>');
+      }
+      closeEditPost();
+    } else {
+      alert(data.error || 'Could not save changes.');
+    }
+  } catch (error) {
+    console.error('Edit post error:', error);
+  }
+}
+
+async function deletePost(postId) {
+  if (!confirm('Delete this post? This cannot be undone.')) return;
+
+  try {
+    const response = await fetch('delete_post.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'post_id=' + postId
+    });
+    const data = await response.json();
+    if (data.success) {
+      const card = document.getElementById('post-' + postId);
+      if (card) card.remove();
+    } else {
+      alert(data.error || 'Could not delete post.');
+    }
+  } catch (error) {
+    console.error('Delete post error:', error);
+  }
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
