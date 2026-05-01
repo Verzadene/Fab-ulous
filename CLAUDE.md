@@ -3,7 +3,7 @@
 ## Project Overview
 - Project: `FABulous`
 - Repository: `https://github.com/Verzadene/Fab-ulous`
-- Purpose: community platform for sharing software and hardware projects, with Google OAuth, email MFA, profile management, posts, messages, and admin tooling.
+- Purpose: community platform for sharing software and hardware projects, with Google OAuth, email MFA, password reset by email, profile management, posts, messages, commissions, and admin tooling.
 
 ## Tech Stack
 - Backend: PHP 8.2 with `mysqli`
@@ -16,7 +16,9 @@
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
 - Main database setup: `database/setup.sql`
-- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`
+- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`
+- Password reset depends on the `password_resets` table from `database/migration_v5.sql`
+- Shared auth page spacing and helper/status styles live in `login/login.css`
 
 ## Instructions For Code Changes
 1. Read the full flow before editing. Authentication changes must check `login/`, `oauth/`, `register/`, `profile/`, and `config.php` together so redirects, sessions, and MFA stay aligned.
@@ -31,12 +33,14 @@
 8. For uploads, validate MIME type and file size, make sure target folders exist and are writable, and account for browser caching when the same filename is reused.
 9. Avoid breaking XAMPP-friendly paths. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...` unless environment config is being updated intentionally.
 10. If a feature depends on a schema migration or config change, surface that clearly in the UI or docs instead of failing silently.
+11. Password reset emails should go through `send_password_reset_email()` in `config.php` so send failures can be surfaced consistently.
 
 ## Verification Checklist
 1. Run `php -l` on every edited PHP file.
 2. Re-test the affected route in the browser after each auth or upload change.
 3. For CSS updates, check both desktop and mobile widths.
 4. For database-related updates, verify behavior against both a fresh setup and a migrated setup when possible.
+5. For password reset changes, verify both the success path and the SMTP failure path so the UI does not falsely claim the code was sent.
 
 ## Recommended Optional Project Files
 - `CLAUDE.local.md`: personal, untracked preferences or reminders
@@ -52,3 +56,4 @@
 - Do not auto-link or auto-create accounts for unknown Google emails without an explicit requirement.
 - Do not introduce new fonts or CSS tokens when existing page variables already cover the need.
 - Do not rely on client-side validation alone for passwords, uploads, or account updates.
+- Do not silently swallow password reset email failures; keep the error visible to the user.

@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $markStmt->execute();
                 $markStmt->close();
 
+                unset($_SESSION['reset_email']);
                 $conn->close();
                 header('Location: login.php?reset=1');
                 exit;
@@ -113,7 +114,7 @@ $conn->close();
         <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
-      <form method="POST" action="">
+      <form method="POST" action="" class="auth-form auth-form--spacious">
         <input type="hidden" name="action" value="reset"/>
         <div class="input-group">
           <input type="email" name="email" class="input-field"
@@ -147,7 +148,7 @@ $conn->close();
         <button type="submit" class="btn-primary">Set New Password</button>
       </form>
 
-      <div class="bottom-links" style="margin-top:16px;">
+      <div class="bottom-links">
         <span class="bottom-text">Need a new code?
           <a href="forgot_password.php" class="link-btn">Request one</a>
         </span>

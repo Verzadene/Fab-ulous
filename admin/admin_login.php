@@ -130,7 +130,7 @@ $conn->close();
         <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
-      <form method="POST" action="">
+      <form method="POST" action="" class="auth-form">
         <div class="input-group">
           <input type="text" name="username" class="input-field"
                  placeholder="Admin Username or Email" autocomplete="username" required/>

@@ -157,7 +157,7 @@ $conn->close();
         <p class="error-msg"><?php echo $errorIsHtml ? $error : htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
-      <form method="POST" action="">
+      <form method="POST" action="" class="auth-form">
         <div class="input-group">
           <input type="text" name="username" id="username" class="input-field"
                  placeholder="Username or Email" autocomplete="username" required/>

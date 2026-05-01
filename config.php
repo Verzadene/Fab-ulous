@@ -398,6 +398,19 @@ function send_mfa_code_email(string $email, string $displayName, string $code): 
     return send_smtp_mail($email, $displayName, $subject, $message);
 }
 
+function send_password_reset_email(string $email, string $displayName, string $code): bool
+{
+    $subject = 'Reset your FABulous password';
+    $message = "Hello {$displayName},\n\n"
+        . "Your FABulous password reset code is: {$code}\n\n"
+        . "This code expires in 30 minutes.\n"
+        . 'Reset page: ' . APP_URL . "/login/reset_password.php\n\n"
+        . "If you did not request a password reset, you can ignore this email.\n\n"
+        . "FABulous Security";
+
+    return send_smtp_mail($email, $displayName, $subject, $message);
+}
+
 function send_registration_verification_email(string $email, string $displayName, string $code): bool
 {
     $subject = 'Verify your FABulous account';

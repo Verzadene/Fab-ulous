@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$account) {
                 $success = 'If that email is registered, a reset code has been sent.';
+                $_SESSION['reset_email'] = $email;
             } elseif (!$tableExists) {
                 $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
             } else {
@@ -47,21 +48,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))"
                 );
                 $insStmt->bind_param('ss', $email, $code);
-                $insStmt->execute();
+                $inserted = $insStmt->execute();
                 $insStmt->close();
 
-                $displayName = trim($account['first_name'] ?? 'User');
-                $subject = 'Reset your FABulous password';
-                $body = "Hello {$displayName},\n\n"
-                    . "Your FABulous password reset code is: {$code}\n\n"
-                    . "This code expires in 30 minutes.\n"
-                    . 'Reset page: ' . APP_URL . "/login/reset_password.php\n\n"
-                    . "If you did not request a password reset, you can ignore this email.\n\n"
-                    . "FABulous Security";
-                send_smtp_mail($email, $displayName, $subject, $body);
+                if (!$inserted) {
+                    $error = 'We could not prepare a reset code. Please try again.';
+                } else {
+                    $displayName = trim((string) ($account['first_name'] ?? ''));
+                    if ($displayName === '') {
+                        $displayName = 'User';
+                    }
 
-                $success = 'If that email is registered, a reset code has been sent.';
-                $_SESSION['reset_email'] = $email;
+                    $mailSent = send_password_reset_email($email, $displayName, $code);
+                    if (!$mailSent) {
+                        $cleanupStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+                        if ($cleanupStmt) {
+                            $cleanupStmt->bind_param('s', $email);
+                            $cleanupStmt->execute();
+                            $cleanupStmt->close();
+                        }
+
+                        unset($_SESSION['reset_email']);
+                        $error = get_last_mail_error() ?: 'We could not send the reset code email. Please try again.';
+                    } else {
+                        $success = 'If that email is registered, a reset code has been sent.';
+                        $_SESSION['reset_email'] = $email;
+                    }
+                }
             }
 
             if ($success) {
@@ -119,7 +132,7 @@ $conn->close();
         Enter your registered email and we will send a 6-digit reset code.
       </p>
 
-      <form method="POST" action="">
+      <form method="POST" action="" class="auth-form auth-form--spacious">
         <input type="hidden" name="action" value="send_code"/>
         <div class="input-group">
           <input type="email" name="email" class="input-field"
@@ -128,7 +141,7 @@ $conn->close();
         <button type="submit" class="btn-primary">Send Reset Code</button>
       </form>
 
-      <div class="bottom-links" style="margin-top:20px;">
+      <div class="bottom-links">
         <span class="bottom-text">Remembered your password?
           <a href="login.php" class="link-btn">Sign In</a>
         </span>
