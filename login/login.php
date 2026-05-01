@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($user && !empty($user['password']) && password_verify($password, $user['password'])) {
         if (in_array($user['role'] ?? '', ['admin', 'super_admin'], true)) {
-            $error = 'Admin accounts must sign in at the <a href="../admin/admin_login.php" class="link-btn">Admin Portal</a>.';
+            $error = 'Invalid username/email or password.';
             $errorIsHtml = true;
         } elseif ($user['banned']) {
             $error = 'Your account has been suspended. Contact the administrator.';
