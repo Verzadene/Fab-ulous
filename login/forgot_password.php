@@ -36,7 +36,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif (!$tableExists) {
                 $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
             } else {
-                $conn->prepare("DELETE FROM password_resets WHERE email = ?")->execute() ?: null;
                 $delStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
                 $delStmt->bind_param('s', $email);
                 $delStmt->execute();
