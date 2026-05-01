@@ -2,3 +2,5 @@ config.local.php
 archive/admin_login_process.php
 uploads
 archive
+login
+admin/admin_login.php
