@@ -4,3 +4,6 @@ uploads
 archive
 login
 admin/admin_login.php
+login/forgot_password.php
+login/login.php
+login/reset_password.php
