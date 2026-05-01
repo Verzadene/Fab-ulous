@@ -9,7 +9,7 @@ if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
 
 $pendingUser = $_SESSION['pending_mfa_user'] ?? null;
 if (!$pendingUser) {
-    header('Location: login.php');
+    header('Location: login.html');
     exit;
 }
 
@@ -105,7 +105,7 @@ $conn->close();
   </nav>
 
   <div class="page-controls">
-    <a href="login.php" class="ctrl-btn return-btn">&#8592; Back to Login</a>
+    <a href="login.html" class="ctrl-btn return-btn">&#8592; Back to Login</a>
   </div>
 
   <main class="card-container verify-card-shell">

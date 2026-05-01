@@ -7,6 +7,12 @@ if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
+// Redirect GET requests to the new HTML entry point
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Location: forgot_password.html');
+    exit;
+}
+
 $step  = 1;
 $error = '';
 $success = '';
@@ -79,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($success) {
                 $conn->close();
-                header('Location: reset_password.php?sent=1');
+                header('Location: reset_password.html?sent=1');
                 exit;
             }
         }

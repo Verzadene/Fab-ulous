@@ -2,6 +2,13 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
+// Redirect GET requests (including OAuth error params) to the new HTML entry point
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: login.html' . ($qs !== '' ? '?' . $qs : ''));
+    exit;
+}
+
 // Google OAuth redirect
 if (isset($_GET['google'])) {
     if (trim(GOOGLE_CLIENT_SECRET) === '') {

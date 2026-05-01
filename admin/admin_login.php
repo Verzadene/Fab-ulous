@@ -7,6 +7,13 @@ if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admi
     exit;
 }
 
+// Redirect GET requests to the new HTML entry point
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: admin_login.html' . ($qs !== '' ? '?' . $qs : ''));
+    exit;
+}
+
 $conn = db_connect();
 
 $error = '';

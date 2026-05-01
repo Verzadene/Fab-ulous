@@ -7,6 +7,13 @@ if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
+// Redirect GET requests to the new HTML entry point
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $qs = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: reset_password.html' . ($qs !== '' ? '?' . $qs : ''));
+    exit;
+}
+
 $sent    = isset($_GET['sent']);
 $error   = '';
 $success = '';
@@ -22,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirm  = $_POST['confirm_password'] ?? '';
 
     if ($action === 'reset') {
+        $account = null;
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please enter a valid email address.';
         } elseif (!$tableExists) {
@@ -73,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 unset($_SESSION['reset_email']);
                 $conn->close();
-                header('Location: login.php?reset=1');
+                header('Location: login.html?ok=reset');
                 exit;
             }
         }
