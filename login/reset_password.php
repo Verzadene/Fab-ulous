@@ -33,6 +33,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($newPass !== $confirm) {
             $error = 'Passwords do not match.';
         } else {
+            $accountStmt = $conn->prepare("SELECT id FROM accounts WHERE email = ? LIMIT 1");
+            $accountStmt->bind_param('s', $email);
+            $accountStmt->execute();
+            $account = $accountStmt->get_result()->fetch_assoc();
+            $accountStmt->close();
+
+            if (!$account) {
+                $error = 'No FABulous account exists for that email address.';
+            }
+        }
+
+        if (!$error) {
             $tokenStmt = $conn->prepare(
                 "SELECT id FROM password_resets
                  WHERE email = ? AND reset_code = ? AND used = 0
@@ -49,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hash = password_hash($newPass, PASSWORD_DEFAULT);
 
-                $updStmt = $conn->prepare("UPDATE accounts SET password = ? WHERE email = ?");
-                $updStmt->bind_param('ss', $hash, $email);
+                $updStmt = $conn->prepare("UPDATE accounts SET password = ? WHERE id = ?");
+                $updStmt->bind_param('si', $hash, $account['id']);
                 $updStmt->execute();
                 $updStmt->close();
 

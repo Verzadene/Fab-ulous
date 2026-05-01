@@ -18,6 +18,7 @@
 - Main database setup: `database/setup.sql`
 - Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`
 - Password reset depends on the `password_resets` table from `database/migration_v5.sql`
+- Forgot-password reset codes should only be created and emailed for existing `accounts.email` values.
 - Shared auth page spacing and helper/status styles live in `login/login.css`
 
 ## Instructions For Code Changes
@@ -57,3 +58,4 @@
 - Do not introduce new fonts or CSS tokens when existing page variables already cover the need.
 - Do not rely on client-side validation alone for passwords, uploads, or account updates.
 - Do not silently swallow password reset email failures; keep the error visible to the user.
+- Do not redirect unknown emails into the reset-password flow as though a reset code was sent.

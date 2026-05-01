@@ -32,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $accStmt->close();
 
             if (!$account) {
-                $success = 'If that email is registered, a reset code has been sent.';
-                $_SESSION['reset_email'] = $email;
+                unset($_SESSION['reset_email']);
+                $error = 'No FABulous account exists for that email address.';
             } elseif (!$tableExists) {
                 $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
             } else {
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         unset($_SESSION['reset_email']);
                         $error = get_last_mail_error() ?: 'We could not send the reset code email. Please try again.';
                     } else {
-                        $success = 'If that email is registered, a reset code has been sent.';
+                        $success = 'Reset code sent. Check your inbox and spam folder.';
                         $_SESSION['reset_email'] = $email;
                     }
                 }
