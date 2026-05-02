@@ -101,11 +101,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($action === 'update_commission' && $targetID) {
         $newStatus = $_POST['commission_status'] ?? '';
         $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
+        $amount = max(0, round((float)($_POST['amount'] ?? 0), 2));
         $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
         if (in_array($newStatus, $allowedStatuses, true)) {
-            $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ? WHERE commissionID = ?");
+            $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?");
             if ($upd) {
-                $upd->bind_param("ssi", $newStatus, $adminNote, $targetID);
+                $upd->bind_param("ssdi", $newStatus, $adminNote, $amount, $targetID);
                 $upd->execute(); $upd->close();
                 $actionMsg = "Commission #$targetID updated.";
             }
@@ -180,7 +181,7 @@ if (isset($commissionColumns['commission_name'])) {
 
 $cRes = $conn->query("
     SELECT c.commissionID, $titleExpr AS title, c.description, c.amount, c.status, c.created_at$noteCol,
-           a.username AS requester
+           a.username AS requester, a.email AS requester_email
     FROM commissions c
     LEFT JOIN accounts a ON c.userID = a.id
     ORDER BY c.created_at DESC
@@ -390,7 +391,21 @@ $conn->close();
                 <tr>
                   <td>#<?php echo $p['postID']; ?></td>
                   <td><?php echo htmlspecialchars($p['username']); ?></td>
-                  <td class="caption-cell"><?php echo htmlspecialchars(mb_substr($p['caption'] ?? '', 0, 80)) . (mb_strlen($p['caption'] ?? '') > 80 ? '…' : ''); ?></td>
+                  <td class="caption-cell caption-cell-expanded">
+                    <?php
+                      $caption = $p['caption'] ?? '';
+                      $shortCaption = mb_substr($caption, 0, 90);
+                      $captionIsLong = mb_strlen($caption) > 90;
+                    ?>
+                    <?php if ($captionIsLong): ?>
+                      <details class="caption-details">
+                        <summary><?php echo htmlspecialchars($shortCaption); ?>...</summary>
+                        <div class="caption-full"><?php echo nl2br(htmlspecialchars($caption)); ?></div>
+                      </details>
+                    <?php else: ?>
+                      <?php echo htmlspecialchars($caption); ?>
+                    <?php endif; ?>
+                  </td>
                   <td><?php echo $p['likes']; ?></td>
                   <td><?php echo $p['comments']; ?></td>
                   <td><?php echo date('M d, Y', strtotime($p['created_at'])); ?></td>
@@ -417,21 +432,30 @@ $conn->close();
         <table class="admin-table commissions-table">
           <thead>
             <tr>
-              <th>ID</th><th>Requester</th><th>Title</th><th>Description</th>
+              <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
               <th>Amount</th><th>Status</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($commissions)): ?>
-              <tr><td colspan="9" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+              <tr><td colspan="10" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
             <?php else: ?>
               <?php foreach ($commissions as $c): ?>
                 <tr>
                   <td>#<?php echo $c['commissionID']; ?></td>
                   <td><?php echo htmlspecialchars($c['requester'] ?? '—'); ?></td>
+                  <td>
+                    <?php if (!empty($c['requester_email'])): ?>
+                      <a class="requester-email" href="mailto:<?php echo htmlspecialchars($c['requester_email']); ?>">
+                        <?php echo htmlspecialchars($c['requester_email']); ?>
+                      </a>
+                    <?php else: ?>
+                      <span class="no-action">—</span>
+                    <?php endif; ?>
+                  </td>
                   <td class="caption-cell"><?php echo htmlspecialchars($c['title'] ?? '—'); ?></td>
                   <td class="caption-cell"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 60)) . (mb_strlen($c['description'] ?? '') > 60 ? '…' : ''); ?></td>
-                  <td>&#8369;<?php echo number_format((float)($c['amount'] ?? 0), 2); ?></td>
+                  <td id="commission-amount-display-<?php echo $c['commissionID']; ?>">&#8369;<?php echo number_format((float)($c['amount'] ?? 0), 2); ?></td>
                   <td>
                     <span
                       class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $c['status'])); ?>"
@@ -456,6 +480,12 @@ $conn->close();
                       <input type="text" name="admin_note" class="commission-note"
                              value="<?php echo htmlspecialchars($c['admin_note'] ?? ''); ?>"
                              placeholder="Add a note…" maxlength="500"/>
+                      <label class="commission-amount-label">
+                        Amount
+                        <input type="number" name="amount" class="commission-amount-input"
+                               value="<?php echo htmlspecialchars(number_format((float)($c['amount'] ?? 0), 2, '.', '')); ?>"
+                               min="0" step="0.01"/>
+                      </label>
                       <button type="submit" class="action-btn btn-save">Save</button>
                     </form>
                   </td>
@@ -515,6 +545,7 @@ async function saveCommissionForm(form, successMessage) {
     const commissionId = form.dataset.commissionId;
     const statusBadge = document.getElementById('commission-status-' + commissionId);
     const noteDisplay = document.getElementById('commission-note-display-' + commissionId);
+    const amountDisplay = document.getElementById('commission-amount-display-' + commissionId);
     const noteField = form.querySelector('.commission-note');
 
     if (statusBadge) {
@@ -524,6 +555,10 @@ async function saveCommissionForm(form, successMessage) {
 
     if (noteDisplay && noteField) {
       noteDisplay.textContent = noteField.value.trim() || 'No note yet.';
+    }
+
+    if (amountDisplay && data.amount_formatted) {
+      amountDisplay.textContent = data.amount_formatted;
     }
 
     showActionMessage(successMessage || `Commission #${commissionId} updated.`);

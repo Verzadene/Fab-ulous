@@ -26,12 +26,26 @@ $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'C
 $pageMsg = '';
 $pageMsgIsError = false;
 
+if (isset($_GET['payment'])) {
+    $paymentState = $_GET['payment'];
+    if ($paymentState === 'success') {
+        $pageMsg = 'Payment checkout completed. The status will update when PayMongo confirms the payment webhook.';
+    } elseif ($paymentState === 'cancelled') {
+        $pageMsg = 'Payment checkout was cancelled.';
+        $pageMsgIsError = true;
+    } elseif ($paymentState === 'error') {
+        $pageMsg = $_GET['message'] ?? 'Payment could not be started.';
+        $pageMsgIsError = true;
+    }
+}
+
 // ── Admin POST: update commission status / note ──────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? '') === 'update_commission') {
     header('Content-Type: application/json');
     $commissionId = (int) ($_POST['target_id'] ?? 0);
     $status       = trim($_POST['commission_status'] ?? '');
     $adminNote    = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
+    $amount       = max(0, round((float) ($_POST['amount'] ?? 0), 2));
 
     if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
         echo json_encode(['success' => false, 'error' => 'Invalid data.']);
@@ -39,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
         exit;
     }
 
-    $upd = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ? WHERE commissionID = ?');
-    $upd->bind_param('ssi', $status, $adminNote, $commissionId);
+    $upd = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
+    $upd->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
     $ok = $upd->execute();
     $upd->close();
 
@@ -58,7 +72,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
     }
 
     $conn->close();
-    echo json_encode(['success' => $ok, 'status' => $status]);
+    echo json_encode([
+        'success' => $ok,
+        'status' => $status,
+        'amount' => $amount,
+        'amount_formatted' => '₱' . number_format($amount, 2),
+    ]);
     exit;
 }
 
@@ -183,6 +202,15 @@ $noteColAdmin = isset($commissionColumns['admin_note']) ? 'c.admin_note' : "'' A
 $noteColUser  = isset($commissionColumns['admin_note']) ? 'admin_note'   : "'' AS admin_note";
 $attachColAdmin = isset($commissionColumns['stl_file_url']) ? 'c.stl_file_url AS attachment_url' : "'' AS attachment_url";
 $attachColUser  = isset($commissionColumns['stl_file_url']) ? 'stl_file_url AS attachment_url' : "'' AS attachment_url";
+$hasPaymentsTable = (bool) $conn->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
+$paymentColsAdmin = $hasPaymentsTable
+    ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = c.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
+         (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = c.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
+    : ", '' AS payment_status, NULL AS paid_at";
+$paymentColsUser = $hasPaymentsTable
+    ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
+         (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
+    : ", '' AS payment_status, NULL AS paid_at";
 
 if ($isAdmin) {
     $stmt = $conn->prepare(
@@ -190,7 +218,9 @@ if ($isAdmin) {
                 c.amount, c.status, c.created_at, {$noteColAdmin}, {$attachColAdmin},
                 a.username AS requester_username,
                 CONCAT(a.first_name, ' ', a.last_name) AS requester_name,
-                a.profile_pic AS requester_pic
+                a.profile_pic AS requester_pic,
+                a.email AS requester_email
+                {$paymentColsAdmin}
          FROM commissions c
          JOIN accounts a ON c.userID = a.id
          ORDER BY c.created_at DESC"
@@ -200,6 +230,7 @@ if ($isAdmin) {
     $stmt = $conn->prepare(
         "SELECT commissionID, {$titleExprUser} AS title, description,
                 amount, status, created_at, {$noteColUser}, {$attachColUser}
+                {$paymentColsUser}
          FROM commissions
          WHERE userID = ?
          ORDER BY created_at DESC"
@@ -357,8 +388,8 @@ foreach ($commissions as $c) {
               <table class="commission-table">
                 <thead>
                   <tr>
-                    <th>ID</th><th>Requester</th><th>Title</th><th>Description</th>
-                    <th>Status / Update</th><th>Amount</th><th>File</th><th>Submitted</th>
+                    <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
+                    <th>Status / Update</th><th>Amount</th><th>Payment</th><th>File</th><th>Submitted</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -377,6 +408,11 @@ foreach ($commissions as $c) {
                           </div>
                         </div>
                       </td>
+                      <td>
+                        <a class="commission-file-link" href="mailto:<?php echo htmlspecialchars($c['requester_email'] ?? ''); ?>">
+                          <?php echo htmlspecialchars($c['requester_email'] ?? ''); ?>
+                        </a>
+                      </td>
                       <td><?php echo htmlspecialchars($c['title'] ?: 'Untitled'); ?></td>
                       <td class="commission-description"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 96)); ?></td>
                       <td>
@@ -390,10 +426,25 @@ foreach ($commissions as $c) {
                             <?php endforeach; ?>
                           </select>
                           <textarea name="admin_note" class="commission-note" placeholder="Progress update / note"><?php echo htmlspecialchars($c['admin_note'] ?? ''); ?></textarea>
+                          <label class="commission-amount-label">
+                            Amount
+                            <input type="number" name="amount" class="commission-amount-input"
+                                   value="<?php echo htmlspecialchars(number_format((float)($c['amount'] ?? 0), 2, '.', '')); ?>"
+                                   min="0" step="0.01"/>
+                          </label>
                           <button type="submit" class="action-btn btn-save">Save</button>
                         </form>
                       </td>
-                      <td>&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></td>
+                      <td class="commission-amount-cell">&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></td>
+                      <td>
+                        <?php if (($c['payment_status'] ?? '') === 'paid'): ?>
+                          <span class="payment-badge paid">Paid</span>
+                        <?php elseif (!empty($c['payment_status'])): ?>
+                          <span class="payment-badge pending"><?php echo htmlspecialchars(ucfirst($c['payment_status'])); ?></span>
+                        <?php else: ?>
+                          <span style="color:rgba(255,255,255,0.3);">—</span>
+                        <?php endif; ?>
+                      </td>
                       <td>
                         <?php if (!empty($c['attachment_url'])): ?>
                           <a href="../<?php echo htmlspecialchars($c['attachment_url']); ?>" target="_blank" class="commission-file-link">&#128196; View</a>
@@ -411,7 +462,7 @@ foreach ($commissions as $c) {
                 <thead>
                   <tr>
                     <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
-                    <th>Amount</th><th>Submitted</th><th>Admin Note</th><th>File</th>
+                    <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>File</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -425,7 +476,28 @@ foreach ($commissions as $c) {
                           <?php echo htmlspecialchars($c['status']); ?>
                         </span>
                       </td>
-                      <td>&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></td>
+                      <td>
+                        <div class="commission-pay-cell">
+                          <span>&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></span>
+                          <?php if ((float)($c['amount'] ?? 0) > 0 && ($c['payment_status'] ?? '') !== 'paid'): ?>
+                            <form method="POST" action="paymongo_checkout.php">
+                              <input type="hidden" name="commission_id" value="<?php echo (int)$c['commissionID']; ?>"/>
+                              <button type="submit" class="commission-pay-btn">Pay</button>
+                            </form>
+                          <?php endif; ?>
+                        </div>
+                      </td>
+                      <td>
+                        <?php if (($c['payment_status'] ?? '') === 'paid'): ?>
+                          <span class="payment-badge paid">Paid</span>
+                        <?php elseif (!empty($c['payment_status'])): ?>
+                          <span class="payment-badge pending"><?php echo htmlspecialchars(ucfirst($c['payment_status'])); ?></span>
+                        <?php elseif ((float)($c['amount'] ?? 0) > 0): ?>
+                          <span class="payment-badge pending">Unpaid</span>
+                        <?php else: ?>
+                          <span style="color:rgba(255,255,255,0.3);">Awaiting amount</span>
+                        <?php endif; ?>
+                      </td>
                       <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
                       <td><?php echo htmlspecialchars($c['admin_note'] ?: 'No update yet.'); ?></td>
                       <td>
@@ -479,9 +551,13 @@ foreach ($commissions as $c) {
         const json = await r.json();
         if (json.success) {
           const badge = form.closest('tr').querySelector('.status-badge');
+          const amountCell = form.closest('tr').querySelector('.commission-amount-cell');
           if (badge) {
             badge.textContent = json.status;
             badge.className = 'status-badge status-' + json.status.toLowerCase().replaceAll(' ', '-');
+          }
+          if (amountCell && json.amount_formatted) {
+            amountCell.textContent = json.amount_formatted;
           }
         }
       } catch (e) { console.error(e); }

@@ -29,13 +29,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // Default: list recent notifications
+    // Default: list unread notifications. Read items are hidden from the drawer
+    // so the checkmark action visibly clears the current notification list.
     $st = $conn->prepare(
         "SELECT n.notifID, n.type, n.post_id, n.ref_id, n.is_read, n.created_at,
                 a.username AS actor_username, a.first_name, a.last_name
          FROM notifications n
          JOIN accounts a ON n.actor_id = a.id
-         WHERE n.userID = ?
+         WHERE n.userID = ? AND n.is_read = 0
          ORDER BY n.created_at DESC
          LIMIT 20"
     );

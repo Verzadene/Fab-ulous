@@ -180,7 +180,15 @@ html, body {
 }
 
 /* ── Audit Log ── */
-.audit-list { display: flex; flex-direction: column; gap: 10px; }
+.audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-color: rgba(119,204,129,0.55) rgba(255,255,255,0.08);
+}
 .audit-entry {
   font-size: 13px;
   color: rgba(255,255,255,0.78);
@@ -246,6 +254,41 @@ html, body {
 .admin-table tr:hover td     { background: rgba(255,255,255,0.03); }
 .banned-row td { opacity: 0.55; }
 .caption-cell  { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.caption-cell-expanded {
+  white-space: normal;
+  overflow: visible;
+}
+
+.caption-details {
+  max-width: 320px;
+}
+
+.caption-details summary {
+  cursor: pointer;
+  color: rgba(255,255,255,0.86);
+  font-weight: 700;
+}
+
+.caption-full {
+  max-width: 420px;
+  max-height: 180px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.82);
+  line-height: 1.5;
+}
+
+.requester-email {
+  color: var(--green-active);
+  text-decoration: none;
+}
+
+.requester-email:hover {
+  text-decoration: underline;
+}
 
 /* ── Badges ── */
 .role-badge {
@@ -273,6 +316,9 @@ html, body {
 }
 .status-badge.status-pending     { background: rgba(243,156,18,0.18); color: #f39c12; }
 .status-badge.status-in-progress { background: rgba(52,152,219,0.18); color: #5dade2; }
+.status-badge.status-accepted    { background: rgba(46,204,113,0.18); color: #2ecc71; }
+.status-badge.status-ongoing     { background: rgba(52,152,219,0.18); color: #5dade2; }
+.status-badge.status-delayed     { background: rgba(230,126,34,0.18); color: #e67e22; }
 .status-badge.status-completed   { background: rgba(46,204,113,0.18); color: #2ecc71; }
 .status-badge.status-cancelled   { background: rgba(231,76,60,0.15);  color: #e74c3c; }
 
@@ -302,7 +348,12 @@ html, body {
   transition: opacity 0.18s, transform 0.15s;
   white-space: nowrap;
 }
-.action-btn:hover { opacity: 0.82; transform: translateY(-1px); }
+.action-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.16);
+}
+.action-btn:active { transform: translateY(0) scale(0.98); }
 .btn-ban     { background: rgba(231,76,60,0.15);   color: #e74c3c; }
 .btn-unban   { background: rgba(119,204,129,0.15);  color: var(--green-active); }
 .btn-promote { background: rgba(52,152,219,0.18);   color: #5dade2; }
@@ -341,6 +392,32 @@ html, body {
 }
 .commission-note:focus { border-color: var(--green-accent); }
 .commission-note::placeholder { color: rgba(255,255,255,0.35); }
+
+.commission-amount-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: rgba(255,255,255,0.62);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.commission-amount-input {
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 6px;
+  color: var(--text-white);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+}
+
+.commission-amount-input:focus {
+  border-color: var(--green-accent);
+}
 
 /* ── Print ── */
 @media print {

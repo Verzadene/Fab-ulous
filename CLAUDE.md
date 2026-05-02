@@ -16,8 +16,9 @@
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
 - Main database setup: `database/setup.sql`
-- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`
+- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`
 - Password reset depends on the `password_resets` table from `database/migration_v5.sql`
+- PayMongo commission payments depend on the `commission_payments` table from `database/migration_v6_paymongo.sql` and placeholder keys in `config.php` or `config.local.php`
 - Forgot-password reset codes should only be created and emailed for existing `accounts.email` values.
 - Shared auth page spacing and helper/status styles live in `login/login.css`
 

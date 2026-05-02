@@ -222,9 +222,6 @@ $conn->close();
       <a href="#" class="nav-item">Projects</a>
       <a href="commissions.php" class="nav-item">Commissions</a>
       <a href="#" class="nav-item">History</a>
-      <?php if ($isAdmin): ?>
-        <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin</a>
-      <?php endif; ?>
     </div>
     <button
       type="button"
@@ -907,8 +904,7 @@ async function loadNotifications() {
 
       item.addEventListener('click', function(event) {
         if (event.target.tagName === 'BUTTON') return;
-        markRead(notification.notifID);
-        item.classList.remove('unread');
+        markRead(notification.notifID).then(loadNotifications);
       });
 
       list.appendChild(item);
@@ -965,7 +961,7 @@ async function rejectFromNotif(friendshipID, notifID) {
 }
 
 async function markRead(notifID) {
-  await fetch('notifications.php', {
+  return fetch('notifications.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'action=mark_read&notif_id=' + notifID

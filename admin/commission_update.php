@@ -13,6 +13,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified']) || !in_array($r
 $commissionId = (int) ($_POST['target_id'] ?? 0);
 $status = trim($_POST['commission_status'] ?? '');
 $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
+$amount = max(0, round((float) ($_POST['amount'] ?? 0), 2));
 $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
 
 if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
@@ -21,8 +22,8 @@ if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
 }
 
 $conn = db_connect();
-$stmt = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ? WHERE commissionID = ?');
-$stmt->bind_param('ssi', $status, $adminNote, $commissionId);
+$stmt = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
+$stmt->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
 $success = $stmt->execute();
 $stmt->close();
 
@@ -45,4 +46,6 @@ $conn->close();
 echo json_encode([
     'success' => $success,
     'status' => $status,
+    'amount' => $amount,
+    'amount_formatted' => '₱' . number_format($amount, 2),
 ]);

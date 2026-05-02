@@ -75,11 +75,6 @@ foreach ($contacts as $contact) {
     }
 }
 
-if (!$selectedContact && !empty($contacts)) {
-    $selectedContact = $contacts[0];
-    $selectedPersonId = (int) $selectedContact['id'];
-}
-
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -168,6 +163,10 @@ $conn->close();
               <span>There are no other registered accounts yet.</span>
             </div>
           <?php else: ?>
+            <div class="messages-empty messages-search-empty" id="friendSearchEmpty" <?php echo $selectedContact ? 'style="display:none;"' : ''; ?>>
+              <strong>Search for someone</strong>
+              <span>Type a name or username to show matching people.</span>
+            </div>
             <?php foreach ($contacts as $contact): ?>
               <?php
                 $contactPic = !empty($contact['profile_pic'])
@@ -180,6 +179,7 @@ $conn->close();
                 class="message-friend-row<?php echo $selectedPersonId === (int) $contact['id'] ? ' active' : ''; ?>"
                 data-name="<?php echo htmlspecialchars(strtolower($contact['name'])); ?>"
                 data-username="<?php echo htmlspecialchars(strtolower($contact['username'])); ?>"
+                style="<?php echo $selectedPersonId === (int) $contact['id'] ? '' : 'display:none;'; ?>"
               >
                 <span class="message-friend-avatar">
                   <?php if ($contactPic): ?>
@@ -384,10 +384,46 @@ $conn->close();
 
     friendFilter?.addEventListener('input', event => {
       const query = event.target.value.trim().toLowerCase();
-      document.querySelectorAll('.message-friend-row').forEach(item => {
-        const haystack = `${item.dataset.name} ${item.dataset.username}`;
-        item.style.display = haystack.includes(query) ? '' : 'none';
-      });
+      const list = document.getElementById('friendList');
+      const empty = document.getElementById('friendSearchEmpty');
+      const rows = Array.from(document.querySelectorAll('.message-friend-row'));
+
+      function matchScore(item) {
+        const name = item.dataset.name || '';
+        const username = item.dataset.username || '';
+        const haystack = `${name} ${username}`;
+        if (!query || !haystack.includes(query)) return Infinity;
+        if (username === query || name === query) return 0;
+        if (username.startsWith(query)) return 1;
+        if (name.startsWith(query)) return 2;
+        const usernameIndex = username.indexOf(query);
+        const nameIndex = name.indexOf(query);
+        return 10 + Math.min(
+          usernameIndex >= 0 ? usernameIndex : 999,
+          nameIndex >= 0 ? nameIndex : 999
+        );
+      }
+
+      let visible = 0;
+      rows
+        .map(item => ({ item, score: matchScore(item) }))
+        .sort((a, b) => a.score - b.score)
+        .forEach(({ item, score }) => {
+          const show = Number.isFinite(score);
+          item.style.display = show ? '' : 'none';
+          if (show) {
+            visible++;
+            list?.appendChild(item);
+          }
+        });
+
+      if (empty) {
+        empty.style.display = query && visible ? 'none' : '';
+        empty.querySelector('strong').textContent = query ? 'No matches found' : 'Search for someone';
+        empty.querySelector('span').textContent = query
+          ? 'Try a more specific username or name.'
+          : 'Type a name or username to show matching people.';
+      }
     });
 
     messageForm?.addEventListener('submit', sendMessage);

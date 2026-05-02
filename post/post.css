@@ -184,10 +184,10 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: linear-gradient(180deg, #93f3a1 0%, #78d68c 100%);
+  background: linear-gradient(180deg, #17251d 0%, #22362a 100%);
   border-radius: 24px 0 0 24px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  box-shadow: -18px 18px 40px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(120, 214, 140, 0.24);
+  box-shadow: -18px 18px 40px rgba(0, 0, 0, 0.34);
   transform: translateX(105%);
   transition: transform 0.28s cubic-bezier(.4, 0, .2, 1);
   z-index: 260;
@@ -204,7 +204,7 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   gap: 6px;
   margin-bottom: 10px;
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(19, 32, 25, 0.12);
+  border-bottom: 1px solid rgba(120, 214, 140, 0.18);
 }
 
 .drawer-avatar {
@@ -215,19 +215,19 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   justify-content: center;
   overflow: hidden;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  border: 2px solid rgba(19, 32, 25, 0.08);
+  background: rgba(248, 255, 249, 0.96);
+  border: 2px solid rgba(120, 214, 140, 0.22);
 }
 
 .drawer-name {
-  color: #173021;
+  color: #f8fff9;
   font-size: 13px;
   font-weight: 700;
   text-align: center;
 }
 
 .drawer-username {
-  color: rgba(23, 48, 33, 0.68);
+  color: rgba(190, 238, 199, 0.82);
   font-size: 11px;
   text-align: center;
 }
@@ -235,21 +235,24 @@ body.menu-open .hamburger-btn span:nth-child(3) {
 .drawer-link {
   padding: 10px 12px;
   border-radius: 12px;
-  color: #173021;
+  color: rgba(248, 255, 249, 0.88);
   text-decoration: none;
   font-size: 12px;
   font-weight: 700;
   text-align: center;
-  transition: background 0.2s ease, transform 0.16s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.16s ease, box-shadow 0.2s ease;
 }
 
 .drawer-link:hover {
-  background: rgba(255, 255, 255, 0.34);
+  background: rgba(120, 214, 140, 0.12);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
 .drawer-link.active {
-  background: rgba(255, 255, 255, 0.92);
+  background: #78d68c;
+  color: #132019;
+  box-shadow: 0 10px 20px rgba(120, 214, 140, 0.2);
 }
 
 .dashboard-body {
@@ -338,6 +341,7 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   transform: translateY(-1px);
   border-color: rgba(120, 214, 140, 0.58);
   background: rgba(120, 214, 140, 0.08);
+  box-shadow: 0 12px 24px rgba(7, 14, 9, 0.12);
 }
 
 .modal-overlay {
@@ -466,6 +470,36 @@ body.menu-open .hamburger-btn span:nth-child(3) {
   background: var(--text-dark);
   border: none;
   color: #fff;
+}
+
+.modal-btn-discard,
+.modal-btn-upload,
+.comment-submit,
+.btn-add-friend,
+.btn-friend-pending,
+.btn-accept-friend {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.modal-btn-discard:hover,
+.modal-btn-upload:hover,
+.comment-submit:hover,
+.btn-add-friend:hover,
+.btn-friend-pending:hover,
+.btn-accept-friend:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(8, 16, 10, 0.12);
+}
+
+.modal-btn-discard:active,
+.modal-btn-upload:active,
+.comment-submit:active,
+.post-action-btn:active,
+.friend-mini-btn:active,
+.btn-add-friend:active,
+.btn-friend-pending:active,
+.btn-accept-friend:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .preview-heading {
