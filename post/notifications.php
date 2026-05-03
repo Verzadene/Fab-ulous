@@ -62,6 +62,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             case 'friend_accepted':
                 $r['message'] = "$actor accepted your friend request.";
                 break;
+            case 'commission_submitted':
+                $r['message'] = "$actor submitted a new commission request.";
+                break;
+            case 'commission_approved':
+                $r['message'] = "$actor approved your commission request.";
+                break;
+            case 'commission_updated':
+                $r['message'] = "$actor updated your commission request.";
+                break;
+            case 'commission_paid':
+                if ((int) ($r['actor_id'] ?? 0) === $myID) {
+                    $r['message'] = "Your commission payment was received.";
+                } else {
+                    $r['message'] = "$actor paid for a commission.";
+                }
+                break;
+            case 'message':
+                $r['message'] = "$actor sent you a message.";
+                break;
             default:
                 $r['message'] = "$actor did something.";
         }

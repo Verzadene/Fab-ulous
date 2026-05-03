@@ -53,12 +53,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
         exit;
     }
 
+    $ownerId = 0;
+    $previousStatus = '';
+    $existing = $conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
+    if ($existing) {
+        $existing->bind_param('i', $commissionId);
+        $existing->execute();
+        $existingRow = $existing->get_result()->fetch_assoc();
+        $existing->close();
+        $ownerId = (int) ($existingRow['userID'] ?? 0);
+        $previousStatus = (string) ($existingRow['status'] ?? '');
+    }
+
     $upd = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
     $upd->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
     $ok = $upd->execute();
     $upd->close();
 
     if ($ok) {
+        if ($ownerId > 0 && $previousStatus !== $status) {
+            $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
+            create_notification($conn, $ownerId, $userId, $notifType, null, $commissionId);
+        }
+
         $logAction = "Updated commission #{$commissionId} to {$status}";
         $log = $conn->prepare(
             "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
@@ -157,15 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
                     while ($admin = $admins->fetch_assoc()) {
                         $adminId = (int) $admin['id'];
                         if ($adminId !== $userId) {
-                            $notif = $conn->prepare(
-                                "INSERT INTO notifications (userID, actor_id, type, ref_id, is_read)
-                                 VALUES (?, ?, 'commission_submitted', ?, 0)"
-                            );
-                            if ($notif) {
-                                $notif->bind_param('iii', $adminId, $actorId, $newId);
-                                $notif->execute();
-                                $notif->close();
-                            }
+                            create_notification($conn, $adminId, $actorId, 'commission_submitted', null, $newId);
                         }
                     }
                 }
@@ -284,9 +293,6 @@ foreach ($commissions as $c) {
     <a href="messages.php" class="drawer-link" onclick="closeDrawer()">Messages</a>
     <a href="commissions.php" class="drawer-link active" onclick="closeDrawer()">Commissions</a>
     <a href="../profile/profile.php" class="drawer-link" onclick="closeDrawer()">Settings</a>
-    <?php if ($isAdmin): ?>
-      <a href="../admin/admin.php" class="drawer-link drawer-admin" onclick="closeDrawer()">Admin Dashboard</a>
-    <?php endif; ?>
     <a href="../login/logout.php" class="drawer-link drawer-logout" onclick="closeDrawer()">Logout</a>
   </nav>
 
@@ -294,12 +300,8 @@ foreach ($commissions as $c) {
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
     <div class="nav-links">
       <a href="post.php" class="nav-item">Home</a>
-      <a href="#" class="nav-item">Projects</a>
       <a href="commissions.php" class="nav-item active">Commissions</a>
       <a href="messages.php" class="nav-item">Messages</a>
-      <?php if ($isAdmin): ?>
-        <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin</a>
-      <?php endif; ?>
     </div>
     <button type="button" class="hamburger-btn" id="burgerBtn"
             aria-label="Toggle menu" aria-controls="navDrawer" aria-expanded="false"
@@ -322,9 +324,6 @@ foreach ($commissions as $c) {
             <p>Track the status of your FABulous service requests in one place.</p>
           <?php endif; ?>
         </div>
-        <?php if ($isAdmin): ?>
-          <a href="../admin/admin.php" class="commission-admin-link">Open Admin Dashboard</a>
-        <?php endif; ?>
       </section>
 
       <?php if ($pageMsg): ?>

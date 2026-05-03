@@ -1,196 +1,116 @@
+/* =============================================
+   COMMISSIONS.CSS — FABulous Premium UI
+   ============================================= */
+
 .commissions-layout {
   width: min(var(--content-width), 100%);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 12px;
-  background: linear-gradient(180deg, rgba(38, 60, 47, 0.92), rgba(34, 54, 42, 0.9));
-  border: 1px solid rgba(120, 214, 140, 0.1);
-  border-radius: 22px;
+  gap: 20px;
+  padding: 20px;
 }
 
+/* ── Hero / Header ─────────────────────────── */
 .commission-hero {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 26px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  border: 1px solid #f0f3f1;
+}
+
+.commission-hero-copy .side-card-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #5ea87a;
+  margin-bottom: 6px;
 }
 
 .commission-hero h1 {
-  color: var(--text-dark);
-  font-size: 32px;
+  color: #0d1f16;
+  font-family: var(--font);
+  font-size: 28px;
   font-weight: 800;
-  margin: 4px 0 10px;
+  margin: 0 0 8px;
 }
 
 .commission-hero p {
-  max-width: 760px;
-  color: #5f6d63;
+  color: #6b7c72;
   font-size: 14px;
   line-height: 1.6;
+  margin: 0;
+  max-width: 560px;
 }
 
-.commission-admin-link {
-  flex-shrink: 0;
-  padding: 12px 18px;
-  border-radius: 999px;
-  background: var(--text-dark);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-}
-
+/* ── Stats Row ─────────────────────────────── */
 .commission-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
+  gap: 14px;
 }
 
 .commission-stat {
-  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  border: 1px solid #f0f3f1;
+  position: relative;
+  overflow: hidden;
+}
+
+.commission-stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #4e9e6a, #77cc81);
+  border-radius: 3px 3px 0 0;
 }
 
 .commission-stat span {
   display: block;
-  color: #6f7e74;
-  font-size: 12px;
+  color: #8a9e93;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
+  margin-bottom: 10px;
 }
 
 .commission-stat strong {
   display: block;
-  margin-top: 10px;
-  color: var(--text-dark);
-  font-size: 28px;
+  color: #0d1f16;
+  font-family: var(--font);
+  font-size: 30px;
   font-weight: 800;
+  line-height: 1;
 }
 
-.commission-table-card {
-  padding: 20px;
-}
-
-.commission-table-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.commission-table-head h2 {
-  color: var(--text-dark);
-  font-size: 24px;
-  font-weight: 800;
-  margin: 0;
-}
-
-.commission-table-wrap {
-  overflow-x: auto;
-  border-radius: 18px;
-  border: 1px solid #edf2ee;
-}
-
-.commission-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-  color: var(--text-dark);
-}
-
-.commission-table th {
-  padding: 13px 16px;
-  background: #f6faf7;
-  color: #698072;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.7px;
-  text-transform: uppercase;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.commission-table td {
-  padding: 14px 16px;
-  border-top: 1px solid #edf2ee;
-  font-size: 14px;
-  vertical-align: top;
-}
-
-.commission-description {
-  min-width: 220px;
-  color: #4f5d54;
-}
-
-.thread-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #eef9f0;
-  color: #4f8b63;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.status-badge.status-pending {
-  background: rgba(243,156,18,0.18);
-  color: #f39c12;
-}
-
-.status-badge.status-in-progress {
-  background: rgba(52,152,219,0.18);
-  color: #5dade2;
-}
-
-.status-badge.status-completed {
-  background: rgba(46,204,113,0.18);
-  color: #2ecc71;
-}
-
-.status-badge.status-cancelled {
-  background: rgba(231,76,60,0.15);
-  color: #e74c3c;
-}
-
-.status-badge.status-accepted {
-  background: rgba(46,204,113,0.18);
-  color: #2ecc71;
-}
-
-.status-badge.status-ongoing {
-  background: rgba(52,152,219,0.18);
-  color: #5dade2;
-}
-
-.status-badge.status-delayed {
-  background: rgba(230,126,34,0.18);
-  color: #e67e22;
-}
-
-/* Commission submission form */
+/* ── Submission Form Card ──────────────────── */
 .commission-submit-card {
-  padding: 24px 26px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  border: 1px solid #f0f3f1;
+}
+
+.commission-submit-card .commission-table-head h2 {
+  color: #0d1f16;
 }
 
 .commission-submit-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 .commission-field {
@@ -200,15 +120,16 @@
 }
 
 .commission-label {
-  font-family: var(--font);
+  font-family: var(--font-body);
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-dark);
+  color: #2d3d34;
+  letter-spacing: 0.2px;
 }
 
 .commission-optional {
   font-weight: 400;
-  color: #7a9280;
+  color: #9aab9f;
   font-size: 12px;
 }
 
@@ -218,36 +139,262 @@
 
 .commission-input,
 .commission-textarea {
-  background: rgba(255,255,255,0.05);
-  border: 1.5px solid rgba(255,255,255,0.1);
+  background: #f8fbf9;
+  border: 1.5px solid #e3ece6;
   border-radius: 10px;
-  padding: 10px 14px;
-  color: var(--text-dark);
+  padding: 11px 14px;
+  color: #0d1f16;
   font-family: var(--font-body);
   font-size: 14px;
   resize: vertical;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .commission-input:focus,
 .commission-textarea:focus {
   outline: none;
-  border-color: rgba(119,204,129,0.5);
+  border-color: #5ea87a;
+  box-shadow: 0 0 0 3px rgba(94, 168, 122, 0.12);
 }
 
 .commission-file-input {
   font-family: var(--font-body);
   font-size: 13px;
-  color: var(--text-dark);
+  color: #4d5e55;
+  padding: 8px 0;
 }
 
 .commission-file-link {
-  color: #77cc81;
+  color: #4e9e6a;
   text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.commission-file-link:hover { text-decoration: underline; }
+
+/* ── Table Card ────────────────────────────── */
+.commission-table-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  border: 1px solid #f0f3f1;
+}
+
+.commission-table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.commission-table-head .side-card-kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #5ea87a;
+  margin-bottom: 4px;
+}
+
+.commission-table-head h2 {
+  color: #0d1f16;
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.thread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #eef9f1;
+  color: #3d8b5c;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  border: 1px solid #c9e8d4;
+}
+
+/* ── Table ─────────────────────────────────── */
+.commission-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid #edf2ee;
+}
+
+.commission-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  color: #0d1f16;
+}
+
+.commission-table thead tr {
+  background: #f7fbf8;
+}
+
+.commission-table th {
+  padding: 12px 16px;
+  color: #7a9284;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #edf2ee;
+}
+
+.commission-table td {
+  padding: 14px 16px;
+  border-top: 1px solid #f2f6f3;
+  font-size: 14px;
+  vertical-align: middle;
+  color: #2d3d34;
+}
+
+.commission-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.commission-table tbody tr:hover {
+  background: #f9fcfa;
+}
+
+.commission-description {
+  min-width: 200px;
+  color: #5a6e61;
   font-size: 13px;
 }
 
-.commission-file-link:hover { text-decoration: underline; }
+/* ── Status Badges ─────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
 
+.status-badge.status-pending {
+  background: #fff8ec;
+  color: #c87f00;
+  border: 1px solid #ffe0a0;
+}
+
+.status-badge.status-accepted {
+  background: #eef9f1;
+  color: #2d8050;
+  border: 1px solid #c9e8d4;
+}
+
+.status-badge.status-ongoing {
+  background: #edf4ff;
+  color: #2a6adb;
+  border: 1px solid #c0d8f8;
+}
+
+.status-badge.status-in-progress {
+  background: #edf4ff;
+  color: #2a6adb;
+  border: 1px solid #c0d8f8;
+}
+
+.status-badge.status-delayed {
+  background: #fff3ec;
+  color: #c05800;
+  border: 1px solid #ffd4b3;
+}
+
+.status-badge.status-completed {
+  background: #eef9f1;
+  color: #2d8050;
+  border: 1px solid #c9e8d4;
+}
+
+.status-badge.status-cancelled {
+  background: #fef0ef;
+  color: #c0392b;
+  border: 1px solid #f7c6c2;
+}
+
+/* ── Admin update form inline ──────────────── */
+.commission-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.commission-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #dce8e0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2d3d34;
+  background: #f8fbf9;
+  cursor: pointer;
+  min-width: 130px;
+}
+
+.commission-note {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #dce8e0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2d3d34;
+  background: #f8fbf9;
+  resize: vertical;
+  min-height: 58px;
+  font-family: var(--font-body);
+}
+
+.commission-amount-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #7a9284;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.commission-amount-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #dce8e0;
+  border-radius: 8px;
+  color: #0d1f16;
+  font-family: var(--font-body);
+  font-size: 13px;
+  background: #f8fbf9;
+  outline: none;
+}
+
+.commission-amount-input:focus {
+  border-color: #5ea87a;
+  box-shadow: 0 0 0 3px rgba(94, 168, 122, 0.1);
+}
+
+.commission-amount-cell {
+  font-weight: 700;
+  color: #0d1f16;
+  white-space: nowrap;
+}
+
+/* ── Payment badges ────────────────────────── */
 .commission-pay-cell {
   display: inline-flex;
   align-items: center;
@@ -255,95 +402,92 @@
   white-space: nowrap;
 }
 
-.commission-pay-cell form {
-  margin: 0;
-}
+.commission-pay-cell form { margin: 0; }
 
 .commission-pay-btn {
   height: 32px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: none;
   border-radius: 999px;
-  background: var(--text-dark);
+  background: #1a3328;
   color: #fff;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  letter-spacing: 0.3px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .commission-pay-btn:hover {
-  background: #294134;
+  background: #2d5040;
   transform: translateY(-1px);
-  box-shadow: 0 10px 18px rgba(19, 32, 25, 0.18);
+  box-shadow: 0 6px 16px rgba(26,51,40,0.22);
 }
 
 .payment-badge {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
 .payment-badge.paid {
-  background: rgba(46,204,113,0.18);
-  color: #2ecc71;
+  background: #eef9f1;
+  color: #2d8050;
+  border: 1px solid #c9e8d4;
 }
 
 .payment-badge.pending {
-  background: rgba(243,156,18,0.18);
-  color: #f39c12;
+  background: #fff8ec;
+  color: #c87f00;
+  border: 1px solid #ffe0a0;
 }
 
-.commission-amount-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: #6f7e74;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.commission-amount-input {
-  width: 100%;
-  padding: 7px 9px;
-  border: 1px solid #dbe5de;
-  border-radius: 8px;
-  color: var(--text-dark);
-  font-family: var(--font-body);
-  font-size: 13px;
-  outline: none;
-}
-
-.commission-amount-input:focus {
-  border-color: rgba(79, 139, 99, 0.5);
-  box-shadow: 0 0 0 3px rgba(79, 139, 99, 0.1);
-}
-
-/* Page-level messages */
+/* ── Page-level messages ───────────────────── */
 .commission-page-msg {
-  padding: 12px 20px;
-  border-radius: 10px;
+  padding: 14px 22px;
+  border-radius: 12px;
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 500;
 }
 
 .commission-msg-ok {
-  background: rgba(46,204,113,0.14);
-  color: #2ecc71;
-  border: 1px solid rgba(46,204,113,0.25);
+  background: #eef9f1;
+  color: #2d8050;
+  border: 1px solid #c9e8d4;
 }
 
 .commission-msg-error {
-  background: rgba(231,76,60,0.12);
-  color: #ff8a8a;
-  border: 1px solid rgba(231,76,60,0.25);
+  background: #fef0ef;
+  color: #c0392b;
+  border: 1px solid #f7c6c2;
 }
 
+/* ── Save button ───────────────────────────── */
+.action-btn.btn-save {
+  align-self: flex-start;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #1a3328;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+  letter-spacing: 0.2px;
+}
+
+.action-btn.btn-save:hover {
+  background: #2d5040;
+  transform: translateY(-1px);
+}
+
+/* ── Empty state ───────────────────────────── */
 .messages-empty {
   min-height: 180px;
   display: flex;
@@ -351,23 +495,53 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 28px;
-  border: 1.5px dashed #dbe5de;
-  border-radius: 20px;
-  background: linear-gradient(180deg, #f9fbf9 0%, #f4f8f4 100%);
-  color: #617065;
+  padding: 32px;
+  border: 1.5px dashed #d4e0d8;
+  border-radius: 16px;
+  background: #f9fbf9;
+  color: #6b7c72;
   text-align: center;
 }
 
 .messages-empty strong {
-  color: #132019;
-  font-size: 18px;
+  color: #0d1f16;
+  font-size: 16px;
+  font-family: var(--font);
 }
 
-.commission-empty {
-  min-height: 260px;
+.commission-empty { min-height: 240px; }
+
+/* ── Submit button (thread-send reuse) ─────── */
+.thread-send {
+  align-self: flex-start;
+  padding: 10px 22px;
+  border: none;
+  border-radius: 999px;
+  background: #1a3328;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.thread-send:hover {
+  background: #2d5040;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(26,51,40,0.22);
+}
+
+/* ── Dashboard body override for commissions ─ */
+.commissions-dashboard {
+  background: #f3f7f4;
+  min-height: calc(100vh - var(--nav-height));
+  padding: 16px 12px 32px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Responsive ────────────────────────────── */
 @media (max-width: 980px) {
   .commission-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -382,5 +556,11 @@
 @media (max-width: 640px) {
   .commission-stats {
     grid-template-columns: 1fr;
+  }
+
+  .commission-hero,
+  .commission-submit-card,
+  .commission-table-card {
+    padding: 20px 18px;
   }
 }

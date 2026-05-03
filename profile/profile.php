@@ -440,7 +440,6 @@ $avatarUrl  = $profilePic
             <?php echo htmlspecialchars($memberSince); ?>
           </p>
           <div class="sidebar-links">
-            <a href="../post/post.php" class="sidebar-nav-link">&#127968; Dashboard</a>
             <a href="../login/logout.php" class="sidebar-nav-link logout">&#8617; Logout</a>
           </div>
         </div>

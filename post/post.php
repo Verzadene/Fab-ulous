@@ -49,54 +49,7 @@ if ($hasFriendships) {
     $posts = $feedStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $feedStmt->close();
 
-    $discStmt = $conn->prepare("
-        SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
-               (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
-               (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
-               EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked,
-               COALESCE((
-                   SELECT status FROM friendships
-                   WHERE (requesterID = ? AND receiverID = a.id)
-                      OR (receiverID = ? AND requesterID = a.id)
-                   LIMIT 1
-               ), 'none') AS friend_status,
-               (SELECT friendshipID FROM friendships
-                WHERE (requesterID = ? AND receiverID = a.id)
-                   OR (receiverID = ? AND requesterID = a.id)
-                LIMIT 1) AS friendship_id,
-               (SELECT requesterID FROM friendships
-                WHERE (requesterID = ? AND receiverID = a.id)
-                   OR (receiverID = ? AND requesterID = a.id)
-                LIMIT 1) AS friend_requester
-        FROM posts p
-        JOIN accounts a ON p.userID = a.id
-        WHERE p.userID != ?
-          AND NOT EXISTS(
-              SELECT 1 FROM friendships
-              WHERE status = 'accepted'
-                AND ((requesterID = ? AND receiverID = p.userID)
-                  OR (receiverID = ? AND requesterID = p.userID))
-          )
-        ORDER BY p.created_at DESC
-        LIMIT 8
-    ");
-    $discStmt->bind_param(
-        "iiiiiiiiii",
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID
-    );
-    $discStmt->execute();
-    $discoverPosts = $discStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $discStmt->close();
+    $discoverPosts = [];
 } else {
     $feedStmt = $conn->prepare("
         SELECT p.postID, p.caption, p.image_url, p.created_at,
@@ -106,15 +59,18 @@ if ($hasFriendships) {
                EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked
         FROM posts p
         JOIN accounts a ON p.userID = a.id
+        WHERE p.userID = ?
         ORDER BY p.created_at DESC
         LIMIT 20
     ");
-    $feedStmt->bind_param("i", $userID);
+    $feedStmt->bind_param("ii", $userID, $userID);
     $feedStmt->execute();
     $posts = $feedStmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $feedStmt->close();
     $discoverPosts = [];
 }
+
+$discoverPosts = [];
 
 $unreadCount = 0;
 if ($hasNotifs) {
@@ -207,7 +163,6 @@ $conn->close();
     </div>
     <a href="post.php" class="drawer-link active" onclick="closeDrawer()">News Feed</a>
     <a href="messages.php" class="drawer-link" onclick="closeDrawer()">Messages</a>
-    <a href="#" class="drawer-link" onclick="closeDrawer()">Uploads</a>
     <a href="../profile/profile.php" class="drawer-link" onclick="closeDrawer()">Settings</a>
     <?php if ($isAdmin): ?>
       <a href="../admin/admin.php" class="drawer-link drawer-admin" onclick="closeDrawer()">Admin Dashboard</a>
@@ -219,9 +174,7 @@ $conn->close();
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
     <div class="nav-links">
       <a href="post.php" class="nav-item active">Home</a>
-      <a href="#" class="nav-item">Projects</a>
       <a href="commissions.php" class="nav-item">Commissions</a>
-      <a href="#" class="nav-item">History</a>
     </div>
     <button
       type="button"

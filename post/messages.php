@@ -109,9 +109,6 @@ $conn->close();
     <a href="messages.php" class="drawer-link active" onclick="closeDrawer()">Messages</a>
     <a href="commissions.php" class="drawer-link" onclick="closeDrawer()">Commissions</a>
     <a href="../profile/profile.php" class="drawer-link" onclick="closeDrawer()">Settings</a>
-    <?php if ($isAdmin): ?>
-      <a href="../admin/admin.php" class="drawer-link drawer-admin" onclick="closeDrawer()">Admin Dashboard</a>
-    <?php endif; ?>
     <a href="../login/logout.php" class="drawer-link drawer-logout" onclick="closeDrawer()">Logout</a>
   </nav>
 
@@ -119,12 +116,8 @@ $conn->close();
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
     <div class="nav-links">
       <a href="post.php" class="nav-item">Home</a>
-      <a href="#" class="nav-item">Projects</a>
       <a href="commissions.php" class="nav-item">Commissions</a>
       <a href="messages.php" class="nav-item active">Messages</a>
-      <?php if ($isAdmin): ?>
-        <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin</a>
-      <?php endif; ?>
     </div>
     <button
       type="button"

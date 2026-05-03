@@ -22,6 +22,18 @@ if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
 }
 
 $conn = db_connect();
+$ownerId = 0;
+$previousStatus = '';
+$existing = $conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
+if ($existing) {
+    $existing->bind_param('i', $commissionId);
+    $existing->execute();
+    $existingRow = $existing->get_result()->fetch_assoc();
+    $existing->close();
+    $ownerId = (int) ($existingRow['userID'] ?? 0);
+    $previousStatus = (string) ($existingRow['status'] ?? '');
+}
+
 $stmt = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
 $stmt->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
 $success = $stmt->execute();
@@ -30,6 +42,11 @@ $stmt->close();
 if ($success) {
     $adminId = (int) $_SESSION['user']['id'];
     $adminUsername = $_SESSION['user']['username'];
+    if ($ownerId > 0 && $previousStatus !== $status) {
+        $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
+        create_notification($conn, $ownerId, $adminId, $notifType, null, $commissionId);
+    }
+
     $action = "Updated commission #{$commissionId} to {$status}";
     $log = $conn->prepare(
         "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)

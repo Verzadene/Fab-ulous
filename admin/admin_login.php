@@ -10,66 +10,78 @@ if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admi
 $conn = db_connect();
 
 $error = '';
+$lockoutBucket = 'fab_admin_login';
+$lockoutRemaining = login_lockout_remaining($lockoutBucket);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input    = trim($_POST['username']);
     $password = $_POST['password'];
 
-    $stmt = $conn->prepare(
-        "SELECT * FROM accounts WHERE (username = ? OR email = ?) AND role IN ('admin', 'super_admin')"
-    );
-    $stmt->bind_param("ss", $input, $input);
-    $stmt->execute();
-    $user = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
+    if ($lockoutRemaining > 0) {
+        $error = '';
+    } else {
+        $stmt = $conn->prepare(
+            "SELECT * FROM accounts WHERE (username = ? OR email = ?) AND role IN ('admin', 'super_admin')"
+        );
+        $stmt->bind_param("ss", $input, $input);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-    if ($user && password_verify($password, $user['password'])) {
-        if ($user['banned']) {
-            $error = 'This admin account has been suspended.';
-        } else {
-            if (!accounts_support_mfa($conn)) {
-                $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
+        if ($user && password_verify($password, $user['password'])) {
+            if ($user['banned']) {
+                $error = 'This admin account has been suspended.';
             } else {
-                $code = (string) random_int(100000, 999999);
-
-                if (!store_mfa_code($conn, (int) $user['id'], $code)) {
-                    $error = 'We could not start MFA verification. Please try again.';
+                if (!accounts_support_mfa($conn)) {
+                    $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
                 } else {
-                    clear_pending_auth();
-                    $_SESSION['pending_mfa_user'] = [
-                        'id' => (int) $user['id'],
-                        'username' => $user['username'],
-                        'email' => $user['email'],
-                        'first_name' => $user['first_name'],
-                        'last_name' => $user['last_name'],
-                        'role' => $user['role'],
-                        'google_id' => $user['google_id'] ?? null,
-                        'profile_pic' => $user['profile_pic'] ?? null,
-                    ];
-                    $_SESSION['pending_mfa_sent_at'] = time();
+                    $code = (string) random_int(100000, 999999);
 
-                    $mailSent = send_mfa_code_email(
-                        $user['email'],
-                        trim($user['first_name'] . ' ' . $user['last_name']),
-                        $code
-                    );
-
-                    if (!$mailSent) {
-                        clear_pending_auth();
-                        clear_mfa_code($conn, (int) $user['id']);
-                        $error = get_last_mail_error() ?: 'A verification code could not be sent to this admin email address.';
+                    if (!store_mfa_code($conn, (int) $user['id'], $code)) {
+                        $error = 'We could not start MFA verification. Please try again.';
                     } else {
-                        header('Location: ../login/verify_mfa.php');
-                        $conn->close();
-                        exit;
+                        clear_login_lockout($lockoutBucket);
+                        clear_pending_auth();
+                        $_SESSION['pending_mfa_user'] = [
+                            'id' => (int) $user['id'],
+                            'username' => $user['username'],
+                            'email' => $user['email'],
+                            'first_name' => $user['first_name'],
+                            'last_name' => $user['last_name'],
+                            'role' => $user['role'],
+                            'google_id' => $user['google_id'] ?? null,
+                            'profile_pic' => $user['profile_pic'] ?? null,
+                        ];
+                        $_SESSION['pending_mfa_sent_at'] = time();
+
+                        $mailSent = send_mfa_code_email(
+                            $user['email'],
+                            trim($user['first_name'] . ' ' . $user['last_name']),
+                            $code
+                        );
+
+                        if (!$mailSent) {
+                            clear_pending_auth();
+                            clear_mfa_code($conn, (int) $user['id']);
+                            $error = get_last_mail_error() ?: 'A verification code could not be sent to this admin email address.';
+                        } else {
+                            header('Location: ../login/verify_mfa.php');
+                            $conn->close();
+                            exit;
+                        }
                     }
                 }
             }
+        } else {
+            $lockoutRemaining = record_login_failure($lockoutBucket);
+            if ($lockoutRemaining <= 0) {
+                $error = 'Invalid credentials or not an admin account.';
+            }
         }
-    } else {
-        $error = 'Invalid credentials or not an admin account.';
     }
 }
 $conn->close();
+$lockoutRemaining = login_lockout_remaining($lockoutBucket);
+$isLocked = $lockoutRemaining > 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -130,23 +142,29 @@ $conn->close();
         <p class="error-msg"><?php echo htmlspecialchars($error); ?></p>
       <?php endif; ?>
 
-      <form method="POST" action="" class="auth-form">
+      <div id="lockoutMsg" data-remaining="<?php echo (int) $lockoutRemaining; ?>" style="<?php echo $isLocked ? '' : 'display:none;'; ?>" class="error-msg">
+        <?php if ($isLocked): ?>
+          Too many failed attempts. Please wait <?php echo (int) $lockoutRemaining; ?> seconds.
+        <?php endif; ?>
+      </div>
+
+      <form method="POST" action="" class="auth-form" id="loginForm">
         <div class="input-group">
           <input type="text" name="username" class="input-field"
-                 placeholder="Admin Username or Email" autocomplete="username" required/>
+                 placeholder="Admin Username or Email" autocomplete="username" required <?php echo $isLocked ? 'disabled' : ''; ?>/>
         </div>
         <div class="input-group">
           <input type="password" name="password" id="password" class="input-field"
-                 placeholder="Password" autocomplete="current-password" required/>
+                 placeholder="Password" autocomplete="current-password" required <?php echo $isLocked ? 'disabled' : ''; ?>/>
         </div>
         <div class="show-password-row">
           <label class="checkbox-label">
-            <input type="checkbox" id="showPass" onchange="togglePassword()"/>
+            <input type="checkbox" id="showPass" onchange="togglePassword()" <?php echo $isLocked ? 'disabled' : ''; ?>/>
             <span class="custom-checkbox"></span>
             Show Password
           </label>
         </div>
-        <button type="submit" class="btn-primary">Sign In as Admin</button>
+        <button type="submit" class="btn-primary" <?php echo $isLocked ? 'disabled' : ''; ?>>Sign In as Admin</button>
       </form>
     </div>
   </main>
@@ -156,6 +174,25 @@ $conn->close();
       document.getElementById('password').type =
         document.getElementById('showPass').checked ? 'text' : 'password';
     }
+
+    (function () {
+      const form = document.getElementById('loginForm');
+      const lockoutMsg = document.getElementById('lockoutMsg');
+      let remaining = parseInt(lockoutMsg?.dataset.remaining || '0', 10);
+
+      if (!remaining || !form || !lockoutMsg) return;
+
+      form.querySelectorAll('input, button').forEach(el => el.disabled = true);
+      const timer = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          window.clearInterval(timer);
+          window.location.reload();
+          return;
+        }
+        lockoutMsg.textContent = 'Too many failed attempts. Please wait ' + remaining + ' second' + (remaining !== 1 ? 's' : '') + '.';
+      }, 1000);
+    })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

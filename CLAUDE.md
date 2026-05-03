@@ -16,9 +16,10 @@
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
 - Main database setup: `database/setup.sql`
-- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`
+- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`, `database/migration_v7_notifications.sql`
 - Password reset depends on the `password_resets` table from `database/migration_v5.sql`
 - PayMongo commission payments depend on the `commission_payments` table from `database/migration_v6_paymongo.sql` and placeholder keys in `config.php` or `config.local.php`
+- Commission, payment, and message notifications depend on the expanded `notifications.type` enum from `database/migration_v7_notifications.sql`.
 - Forgot-password reset codes should only be created and emailed for existing `accounts.email` values.
 - Shared auth page spacing and helper/status styles live in `login/login.css`
 
@@ -60,3 +61,5 @@
 - Do not rely on client-side validation alone for passwords, uploads, or account updates.
 - Do not silently swallow password reset email failures; keep the error visible to the user.
 - Do not redirect unknown emails into the reset-password flow as though a reset code was sent.
+- Keep uploaded user content out of git; `/uploads/` is ignored because local profile, post, and commission files differ between machines.
+- Feed posts from other accounts are friend-only; discovery and moderation surfaces must not leak non-friend posts into the user feed.

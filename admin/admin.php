@@ -42,14 +42,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 
     if ($action === 'unban_user' && $targetID) {
-        $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
-        $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ? AND role IN $allowedRoles");
-        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
+        $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ? AND role IN ('user','admin','super_admin') AND id != ?");
+        $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
         $sel = $conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         $logAction = "Unbanned user: " . ($row['username'] ?? 'Unknown');
-        $vis = ($row['role'] ?? 'user') === 'user' ? 'admin' : 'super_admin';
+        $vis = in_array(($row['role'] ?? 'user'), ['admin', 'super_admin'], true) ? 'super_admin' : 'admin';
         $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
         $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
         $log->execute(); $log->close();
@@ -104,10 +103,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $amount = max(0, round((float)($_POST['amount'] ?? 0), 2));
         $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
         if (in_array($newStatus, $allowedStatuses, true)) {
+            $ownerId = 0;
+            $previousStatus = '';
+            $existing = $conn->prepare("SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1");
+            if ($existing) {
+                $existing->bind_param("i", $targetID);
+                $existing->execute();
+                $existingRow = $existing->get_result()->fetch_assoc();
+                $existing->close();
+                $ownerId = (int)($existingRow['userID'] ?? 0);
+                $previousStatus = (string)($existingRow['status'] ?? '');
+            }
+
             $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?");
             if ($upd) {
                 $upd->bind_param("ssdi", $newStatus, $adminNote, $amount, $targetID);
                 $upd->execute(); $upd->close();
+                if ($ownerId > 0 && $previousStatus !== $newStatus) {
+                    $notifType = $newStatus === 'Accepted' ? 'commission_approved' : 'commission_updated';
+                    create_notification($conn, $ownerId, $adminID, $notifType, null, $targetID);
+                }
                 $actionMsg = "Commission #$targetID updated.";
             }
         }
@@ -318,8 +333,9 @@ $conn->close();
                 $isSelf      = ((int)$u['id'] === $adminID);
                 $isSuperTgt  = ($uRole === 'super_admin');
                 $isAdminTgt  = ($uRole === 'admin');
-                // Admins can only act on plain users; super_admin can act on users and admins (not self, not other supers)
-                $canBan      = !$isSelf && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
+                // Admins can unban admin peers so suspended staff accounts can be recovered.
+                $canUnban    = !$isSelf && (bool)$u['banned'] && in_array($uRole, ['user','admin','super_admin'], true);
+                $canBan      = !$isSelf && !$u['banned'] && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
                 $canPromote  = $isSuperAdmin && $uRole === 'user';
                 $canDemote   = $isSuperAdmin && $isAdminTgt && !$isSelf;
               ?>
@@ -334,14 +350,14 @@ $conn->close();
                     : '<span class="active-badge">Active</span>'; ?></td>
                 <td><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
                 <td class="action-cell">
-                  <?php if ($canBan): ?>
+                  <?php if ($canBan || $canUnban): ?>
                     <form method="POST" style="display:inline;">
-                      <input type="hidden" name="action"    value="<?php echo $u['banned'] ? 'unban_user' : 'ban_user'; ?>"/>
+                      <input type="hidden" name="action"    value="<?php echo $canUnban ? 'unban_user' : 'ban_user'; ?>"/>
                       <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
                       <button type="submit"
-                              class="action-btn <?php echo $u['banned'] ? 'btn-unban' : 'btn-ban'; ?>"
-                              onclick="return confirm('<?php echo $u['banned'] ? 'Unban' : 'Ban'; ?> this user?')">
-                        <?php echo $u['banned'] ? 'Unban' : 'Ban'; ?>
+                              class="action-btn <?php echo $canUnban ? 'btn-unban' : 'btn-ban'; ?>"
+                              onclick="return confirm('<?php echo $canUnban ? 'Unban' : 'Ban'; ?> this account?')">
+                        <?php echo $canUnban ? 'Unban' : 'Ban'; ?>
                       </button>
                     </form>
                   <?php endif; ?>
@@ -361,7 +377,7 @@ $conn->close();
                               onclick="return confirm('Demote this admin to user?')">Demote</button>
                     </form>
                   <?php endif; ?>
-                  <?php if (!$canBan && !$canPromote && !$canDemote): ?>
+                  <?php if (!$canBan && !$canUnban && !$canPromote && !$canDemote): ?>
                     <span class="no-action">—</span>
                   <?php endif; ?>
                 </td>
