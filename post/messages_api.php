@@ -161,6 +161,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->bind_param('iis', $userId, $friendId, $message);
     $success = $stmt->execute();
     $stmt->close();
+
+    if ($success) {
+        create_notification($conn, $friendId, $userId, 'message', null, $userId);
+    }
+
     $conn->close();
 
     echo json_encode(['success' => $success]);

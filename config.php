@@ -103,6 +103,88 @@ function clear_pending_auth(): void
     unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
 }
 
+function login_lockout_remaining(string $bucket): int
+{
+    $key = $bucket . '_lockout_until';
+    $until = (int) ($_SESSION[$key] ?? 0);
+
+    if ($until <= time()) {
+        unset($_SESSION[$key], $_SESSION[$bucket . '_attempts']);
+        return 0;
+    }
+
+    return $until - time();
+}
+
+function record_login_failure(string $bucket, int $maxAttempts = 5, int $lockoutSeconds = 60): int
+{
+    $attemptKey = $bucket . '_attempts';
+    $_SESSION[$attemptKey] = (int) ($_SESSION[$attemptKey] ?? 0) + 1;
+
+    if ($_SESSION[$attemptKey] >= $maxAttempts) {
+        $_SESSION[$bucket . '_lockout_until'] = time() + $lockoutSeconds;
+        unset($_SESSION[$attemptKey]);
+        return $lockoutSeconds;
+    }
+
+    return 0;
+}
+
+function clear_login_lockout(string $bucket): void
+{
+    unset($_SESSION[$bucket . '_attempts'], $_SESSION[$bucket . '_lockout_until']);
+}
+
+function notification_type_supported(mysqli $conn, string $type): bool
+{
+    static $supportedTypes = null;
+
+    if ($supportedTypes === null) {
+        $supportedTypes = [];
+        $tableCheck = $conn->query("SHOW TABLES LIKE 'notifications'");
+        if (!$tableCheck || $tableCheck->num_rows === 0) {
+            return false;
+        }
+
+        $columnCheck = $conn->query("SHOW COLUMNS FROM notifications LIKE 'type'");
+        $column = $columnCheck ? $columnCheck->fetch_assoc() : null;
+        $typeDefinition = $column['Type'] ?? '';
+
+        if (preg_match_all("/'([^']+)'/", $typeDefinition, $matches)) {
+            $supportedTypes = array_fill_keys($matches[1], true);
+        }
+    }
+
+    return isset($supportedTypes[$type]);
+}
+
+function create_notification(
+    mysqli $conn,
+    int $recipientId,
+    int $actorId,
+    string $type,
+    ?int $postId = null,
+    ?int $refId = null
+): bool {
+    if ($recipientId <= 0 || $actorId <= 0 || !notification_type_supported($conn, $type)) {
+        return false;
+    }
+
+    $stmt = $conn->prepare(
+        "INSERT INTO notifications (userID, actor_id, type, post_id, ref_id, is_read)
+         VALUES (?, ?, ?, ?, ?, 0)"
+    );
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('iisii', $recipientId, $actorId, $type, $postId, $refId);
+    $ok = $stmt->execute();
+    $stmt->close();
+
+    return $ok;
+}
+
 function prime_google_registration_prefill(string $email, string $fullName, string $googleId): void
 {
     $parts = preg_split('/\s+/', trim($fullName), 2) ?: [];

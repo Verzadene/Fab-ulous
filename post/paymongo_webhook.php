@@ -128,7 +128,28 @@ $stmt->execute();
 $affected = $stmt->affected_rows;
 $stmt->close();
 
-if ($commissionId) {
+if ($commissionId && $affected > 0) {
+    $commissionOwnerId = 0;
+    $ownerStmt = $conn->prepare("SELECT userID FROM commissions WHERE commissionID = ? LIMIT 1");
+    if ($ownerStmt) {
+        $ownerStmt->bind_param('i', $commissionId);
+        $ownerStmt->execute();
+        $ownerRow = $ownerStmt->get_result()->fetch_assoc();
+        $ownerStmt->close();
+        $commissionOwnerId = (int)($ownerRow['userID'] ?? 0);
+    }
+
+    if ($commissionOwnerId > 0) {
+        create_notification($conn, $commissionOwnerId, $commissionOwnerId, 'commission_paid', null, $commissionId);
+
+        $admins = $conn->query("SELECT id FROM accounts WHERE role IN ('admin','super_admin') AND banned = 0");
+        if ($admins) {
+            while ($admin = $admins->fetch_assoc()) {
+                create_notification($conn, (int)$admin['id'], $commissionOwnerId, 'commission_paid', null, $commissionId);
+            }
+        }
+    }
+
     $log = $conn->prepare(
         "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
          VALUES (0, 'PayMongo', ?, 'commission', ?, 'admin')"

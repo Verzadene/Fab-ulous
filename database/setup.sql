@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     notifID    INT AUTO_INCREMENT PRIMARY KEY,
     userID     INT NOT NULL,
     actor_id   INT NOT NULL,
-    type       ENUM('like','comment','friend_request','friend_accepted') NOT NULL,
+    type       ENUM('like','comment','friend_request','friend_accepted','commission_submitted','commission_approved','commission_updated','commission_paid','message') NOT NULL,
     post_id    INT DEFAULT NULL,
     ref_id     INT DEFAULT NULL,
     is_read    TINYINT(1) DEFAULT 0,
