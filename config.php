@@ -29,11 +29,11 @@ defined('APP_URL') || define('APP_URL', getenv('APP_URL') ?: 'http://localhost/F
 // PayMongo Checkout
 defined('PAYMONGO_SECRET_KEY') || define(
     'PAYMONGO_SECRET_KEY',
-    getenv('PAYMONGO_SECRET_KEY') ?: 'sk_test_REPLACE_WITH_PAYMONGO_SECRET_KEY'
+    getenv('PAYMONGO_SECRET_KEY') ?: 'sk_test_vseYJkB7K2tVaQhRdyB39ZHa'
 );
 defined('PAYMONGO_WEBHOOK_SECRET') || define(
     'PAYMONGO_WEBHOOK_SECRET',
-    getenv('PAYMONGO_WEBHOOK_SECRET') ?: 'whsec_REPLACE_WITH_PAYMONGO_WEBHOOK_SECRET'
+    getenv('PAYMONGO_WEBHOOK_SECRET') ?: 'http://localhost/post/paymongo_webhook.php'
 );
 defined('PAYMONGO_API_BASE') || define('PAYMONGO_API_BASE', getenv('PAYMONGO_API_BASE') ?: 'https://api.paymongo.com/v1');
 defined('PAYMONGO_PAYMENT_METHOD_TYPES') || define('PAYMONGO_PAYMENT_METHOD_TYPES', getenv('PAYMONGO_PAYMENT_METHOD_TYPES') ?: 'card,gcash');
