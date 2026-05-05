@@ -103,6 +103,45 @@ function clear_pending_auth(): void
     unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
 }
 
+function get_current_user_avatar(): ?string
+{
+    if (empty($_SESSION['user']['id'])) {
+        return null;
+    }
+
+    $pic = $_SESSION['user']['profile_pic'] ?? null;
+
+    // If session doesn't have it (e.g. stale login session), fetch from DB once to sync session.
+    if ($pic === null && empty($_SESSION['user']['profile_pic_synced'])) {
+        $conn = db_connect();
+        $colCheck = $conn->query("SHOW COLUMNS FROM accounts LIKE 'profile_pic'");
+        if ($colCheck && $colCheck->num_rows > 0) {
+            $stmt = $conn->prepare("SELECT profile_pic FROM accounts WHERE id = ?");
+            if ($stmt) {
+                $uid = (int) $_SESSION['user']['id'];
+                $stmt->bind_param("i", $uid);
+                $stmt->execute();
+                $row = $stmt->get_result()->fetch_assoc();
+                if ($row && !empty($row['profile_pic'])) {
+                    $pic = $row['profile_pic'];
+                    $_SESSION['user']['profile_pic'] = $pic;
+                }
+                $stmt->close();
+            }
+        }
+        $conn->close();
+        $_SESSION['user']['profile_pic_synced'] = true;
+    }
+
+    if ($pic) {
+        $avatarPath = __DIR__ . '/uploads/profile_pics/' . $pic;
+        $v = file_exists($avatarPath) ? filemtime($avatarPath) : time();
+        return '../uploads/profile_pics/' . rawurlencode($pic) . '?v=' . $v;
+    }
+
+    return null;
+}
+
 function login_lockout_remaining(string $bucket): int
 {
     $key = $bucket . '_lockout_until';

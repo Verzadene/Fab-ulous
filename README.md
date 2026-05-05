@@ -80,16 +80,22 @@ Fab-ulous/
 │   ├── post.php                  # Main authenticated feed (posts, friend actions, notifications)
 │   ├── post.css                  # Feed page styles (also defines topnav for all post/ pages)
 │   ├── post.html                 # Static shell / redirect shim
+│   ├── feed_api.php              # GET: returns main feed as JSON
 │   ├── create_post.php           # POST handler: create post with optional image upload
 │   ├── edit_post.php             # POST handler: edit post caption (owner only)
 │   ├── delete_post.php           # POST handler: delete post (owner only)
 │   ├── like.php                  # POST handler: toggle like; returns updated count as JSON
 │   ├── comment.php               # GET/POST: fetch or add comments for a post
-│   ├── friends.php               # GET/POST: friendship state machine (request, accept, reject, remove)
-│   ├── notifications.php         # GET/POST: list notifications, count unread, mark as read
 │   ├── messages.php              # Messaging UI (requires messages table from v5)
-│   ├── messages_api.php          # GET/POST AJAX: load conversation history and send messages
 │   ├── messages.css
+│   ├── friends.php               # GET/POST API: friendship state machine and directory
+│   ├── notifications.php         # GET/POST API: list notifications, count unread, mark as read
+│   ├── messages_api.php          # GET/POST API: load conversation history and send messages
+│   ├── PostRepository.php        # DB abstraction: Post data
+│   ├── FriendRepository.php      # DB abstraction: Friendships and requests
+│   ├── MessageRepository.php     # DB abstraction: Messaging operations
+│   ├── NotificationRepository.php# DB abstraction: Notification operations
+│   ├── CommissionRepository.php  # DB abstraction: Commission requests and updates
 │   ├── commissions.php           # Commission submit (users) + status management (admins)
 │   ├── commissions.css
 │   ├── paymongo_checkout.php     # POST handler: create PayMongo checkout session; redirect to payment URL
@@ -164,6 +170,11 @@ Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent rel
 | `$_SESSION['pending_mfa_sent_at']` | `int` | Unix timestamp when MFA code was last sent; controls resend cooldown |
 | `$_SESSION['{bucket}_attempts']` | `int` | Increments on each failed login attempt |
 | `$_SESSION['{bucket}_lockout_until']` | `int` | Unix timestamp when lockout expires |
+
+### Profile Picture Convention
+The application maintains a single source of truth for the logged-in user's avatar via the `get_current_user_avatar()` helper in `config.php`.
+This helper safely reads `$_SESSION['user']['profile_pic']` and falls back to querying the database if the session is stale.
+To prevent browser caching issues after an update, the backend appends a cache-busting timestamp (`?v=...`) to the avatar URL globally based on the file's modification time.
 
 ### Role hierarchy
 
@@ -413,16 +424,17 @@ http://localhost/Fab-ulous/landing/landing.html
 | Endpoint | Method | Purpose | Called by |
 |---|---|---|---|
 | `register/prefill.php` | GET | Return Google OAuth prefill data as JSON | `register/register.js` |
+| `post/feed_api.php` | GET | Fetch the main social feed for the user | `post/post.php` JS |
 | `post/like.php` | POST | Toggle like; return updated count | `post/post.php` |
 | `post/comment.php` | GET, POST | Fetch or add post comments | `post/post.php` |
-| `post/friends.php` | GET, POST | Friendship state machine | `post/post.php` |
-| `post/notifications.php` | GET, POST | List / count / mark-read notifications | `post/post.php` |
+| `post/friends.php` | GET, POST | Fetch friend directory; Friendship state machine | `post/post.php` JS |
+| `post/notifications.php` | GET, POST | List / count / mark-read notifications | `post/post.php` JS |
 | `post/messages_api.php` | GET, POST | Load conversation history; send message | `post/messages.php` |
-| `post/edit_post.php` | POST | Edit post caption (owner only) | `post/post.php` |
-| `post/delete_post.php` | POST | Delete post (owner only) | `post/post.php` |
+| `post/edit_post.php` | POST | Edit post caption (owner only) | `post/post.php` JS |
+| `post/delete_post.php` | POST | Delete post (owner only) | `post/post.php` JS |
 | `post/create_post.php` | POST | Create post with optional image | `post/post.php` |
-| `post/commissions.php` | POST | Submit commission (user); update status (admin) — returns JSON | `post/commissions.php` JS |
-| `post/paymongo_checkout.php` | POST | Create PayMongo checkout session; redirect to payment URL | `post/commissions.php` form |
+| `post/commissions.php` | GET, POST | List commissions (JSON); submit commission (user); update status (admin) | `post/commissions.php` JS |
+| `post/paymongo_checkout.php` | POST | Create PayMongo checkout session | `post/commissions.php` JS |
 | `post/paymongo_webhook.php` | POST | Receive PayMongo webhook; update `commission_payments` | PayMongo servers |
 | `admin/commission_update.php` | POST | Update commission from admin dashboard | `admin/admin.php` |
 
