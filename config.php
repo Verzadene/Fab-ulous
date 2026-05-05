@@ -147,7 +147,11 @@ function get_current_user_avatar(): ?string
 function login_lockout_remaining(string $bucket): int
 {
     $key = $bucket . '_lockout_until';
-    $until = (int) ($_SESSION[$key] ?? 0);
+    
+    if (!isset($_SESSION[$key])) {
+        return 0;
+    }
+    $until = (int) $_SESSION[$key];
 
     if ($until <= time()) {
         unset($_SESSION[$key], $_SESSION[$bucket . '_attempts']);

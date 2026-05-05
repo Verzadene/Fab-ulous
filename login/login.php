@@ -2,8 +2,16 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
+$lockoutBucket = 'fab_global_login';
+$lockoutRemaining = login_lockout_remaining($lockoutBucket);
+
 // Google OAuth redirect
 if (isset($_GET['google'])) {
+    if ($lockoutRemaining > 0) {
+        header('Location: login.php');
+        exit;
+    }
+
     if (trim(GOOGLE_CLIENT_SECRET) === '') {
         header('Location: login.php?error=google_oauth_config');
         exit;
@@ -23,8 +31,6 @@ if (isset($_GET['google'])) {
 $conn = db_connect();
 $error = '';
 $errorIsHtml = false;
-$lockoutBucket = 'fab_user_login';
-$lockoutRemaining = login_lockout_remaining($lockoutBucket);
 
 $loginSuccess = '';
 if (isset($_GET['reset']) && $_GET['reset'] === '1') {
@@ -244,7 +250,20 @@ $isLocked = $lockoutRemaining > 0;
 
       if (!remaining || !form || !lockoutMsg) return;
 
+      if (remaining >= 59) {
+        alert("Too many failed attempts. You are locked out from typing your credentials for 1 minute.");
+      }
+
       form.querySelectorAll('input, button').forEach(el => el.disabled = true);
+      
+      document.querySelectorAll('.btn-google, .bottom-links a').forEach(el => {
+        el.style.pointerEvents = 'none';
+        el.style.opacity = '0.5';
+        el.tabIndex = -1;
+      });
+      const orDivider = document.querySelector('.or-divider');
+      if (orDivider) orDivider.style.opacity = '0.5';
+      
       const timer = window.setInterval(() => {
         remaining -= 1;
         if (remaining <= 0) {

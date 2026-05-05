@@ -10,7 +10,7 @@ if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admi
 $conn = db_connect();
 
 $error = '';
-$lockoutBucket = 'fab_admin_login';
+$lockoutBucket = 'fab_global_login';
 $lockoutRemaining = login_lockout_remaining($lockoutBucket);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input    = trim($_POST['username']);
@@ -171,6 +171,10 @@ $isLocked = $lockoutRemaining > 0;
       let remaining = parseInt(lockoutMsg?.dataset.remaining || '0', 10);
 
       if (!remaining || !form || !lockoutMsg) return;
+
+      if (remaining >= 59) {
+        alert("Too many failed attempts. You are locked out from typing your credentials for 1 minute.");
+      }
 
       form.querySelectorAll('input, button').forEach(el => el.disabled = true);
       const timer = window.setInterval(() => {

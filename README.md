@@ -271,10 +271,9 @@ Implemented entirely in `config.php` via session variables. Both login pages use
 | Max attempts before lockout | 5 |
 | Lockout duration | 60 seconds |
 | Resets on | Successful credential + MFA completion (`clear_login_lockout()`) |
-| User login bucket | `fab_user_login` |
-| Admin login bucket | `fab_admin_login` |
+| Global login bucket | `fab_global_login` (interconnected across user and admin pages) |
 
-**Flow:** `record_login_failure($bucket)` increments `$_SESSION['{bucket}_attempts']`. On the 5th failure it sets `$_SESSION['{bucket}_lockout_until'] = time() + 60` and clears the counter. `login_lockout_remaining($bucket)` returns seconds remaining (0 = not locked). The browser-side JS timer re-enables the form when `remaining` reaches 0 and reloads.
+**Flow:** `record_login_failure($bucket)` increments `$_SESSION['{bucket}_attempts']`. On the 5th failure it sets `$_SESSION['{bucket}_lockout_until'] = time() + 60` and clears the counter. `login_lockout_remaining($bucket)` returns seconds remaining (0 = not locked). While locked out, a popup is displayed to the user, and the form inputs + external authentication links (Google, Register, Forgot Password) are completely disabled. The browser-side JS timer re-enables the form when `remaining` reaches 0 and reloads.
 
 **Known quirk in repo version of `login.php`:** Admin credentials entered into the *user* login form correctly record a failure (they are rejected at the role check), but the error message is not shown to the user until the attempt count crosses the lockout threshold — meaning up to 4 silent rejections. This is intentional as a mild security measure (avoids confirming that admin accounts exist).
 
