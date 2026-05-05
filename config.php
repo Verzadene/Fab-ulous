@@ -84,6 +84,8 @@ function dashboard_path_for_role(string $role): string
 
 function begin_user_session(array $user, bool $mfaVerified = true, string $authMethod = 'password'): void
 {
+    session_regenerate_id(true);
+
     $_SESSION['user'] = [
         'id' => (int) $user['id'],
         'username' => $user['username'],
