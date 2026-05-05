@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/NotificationRepository.php';
 header('Content-Type: application/json');
 
 if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
@@ -9,6 +10,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 }
 
 $conn = db_connect();
+$repo = new NotificationRepository($conn);
 
 $myID = (int)$_SESSION['user']['id'];
 
@@ -17,13 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = $_GET['action'] ?? 'list';
 
     if ($action === 'count') {
-        $st = $conn->prepare(
-            "SELECT COUNT(*) AS c FROM notifications WHERE userID = ? AND is_read = 0"
-        );
-        $st->bind_param("i", $myID);
-        $st->execute();
-        $count = (int)$st->get_result()->fetch_assoc()['c'];
-        $st->close();
+        $count = $repo->getUnreadCount($myID);
         $conn->close();
         echo json_encode(['success' => true, 'count' => $count]);
         exit;
@@ -31,19 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     // Default: list unread notifications. Read items are hidden from the drawer
     // so the checkmark action visibly clears the current notification list.
-    $st = $conn->prepare(
-        "SELECT n.notifID, n.type, n.post_id, n.ref_id, n.is_read, n.created_at,
-                a.username AS actor_username, a.first_name, a.last_name
-         FROM notifications n
-         JOIN accounts a ON n.actor_id = a.id
-         WHERE n.userID = ? AND n.is_read = 0
-         ORDER BY n.created_at DESC
-         LIMIT 20"
-    );
-    $st->bind_param("i", $myID);
-    $st->execute();
-    $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
-    $st->close();
+    $rows = $repo->getUnreadNotifications($myID);
     $conn->close();
 
     // Build human-readable messages
@@ -97,22 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'mark_read') {
         $notifID = (int)($_POST['notif_id'] ?? 0);
-        if ($notifID) {
-            $st = $conn->prepare(
-                "UPDATE notifications SET is_read = 1 WHERE notifID = ? AND userID = ?"
-            );
-            $st->bind_param("ii", $notifID, $myID);
-            $st->execute();
-            $st->close();
-        } else {
-            // Mark ALL as read
-            $st = $conn->prepare(
-                "UPDATE notifications SET is_read = 1 WHERE userID = ?"
-            );
-            $st->bind_param("i", $myID);
-            $st->execute();
-            $st->close();
-        }
+        $repo->markAsRead($myID, $notifID);
         $conn->close();
         echo json_encode(['success' => true]);
         exit;

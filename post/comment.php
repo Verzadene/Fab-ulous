@@ -1,35 +1,26 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/InteractionRepository.php';
 header('Content-Type: application/json');
 
 if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
-    echo json_encode(['success' => false, 'error' => 'Not logged in']);
+    echo json_encode(['status' => 'error', 'message' => 'Not logged in']);
     exit;
 }
 
 $conn = db_connect();
+$repo = new InteractionRepository($conn);
 
 $userID = (int)$_SESSION['user']['id'];
 
 // ── GET: fetch comments ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get') {
     $postID = (int)($_GET['post_id'] ?? 0);
-    $cstmt  = $conn->prepare(
-        "SELECT c.content, c.created_at, a.username
-         FROM comments c JOIN accounts a ON c.userID = a.id
-         WHERE c.postID = ?
-         ORDER BY c.created_at ASC
-         LIMIT 50"
-    );
-    $cstmt->bind_param("i", $postID);
-    $cstmt->execute();
-    $result   = $cstmt->get_result();
-    $cstmt->close();
-    $comments = [];
-    if ($result) while ($r = $result->fetch_assoc()) $comments[] = $r;
+    $comments = $repo->getComments($postID);
     $conn->close();
-    echo json_encode(['success' => true, 'comments' => $comments]);
+    
+    echo json_encode(['status' => 'success', 'data' => ['comments' => $comments]]);
     exit;
 }
 
@@ -39,41 +30,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $content = trim($_POST['content'] ?? '');
 
     if (!$postID || empty($content)) {
-        echo json_encode(['success' => false, 'error' => 'Missing data']);
+        echo json_encode(['status' => 'error', 'message' => 'Missing data']);
+        $conn->close();
         exit;
     }
 
     $content = mb_substr($content, 0, 500);
 
-    // Get post owner for notification
-    $ownerStmt = $conn->prepare("SELECT userID FROM posts WHERE postID = ?");
-    $ownerStmt->bind_param("i", $postID);
-    $ownerStmt->execute();
-    $ownerRow = $ownerStmt->get_result()->fetch_assoc();
-    $ownerStmt->close();
-    $postOwnerID = $ownerRow ? (int)$ownerRow['userID'] : 0;
+    $postOwnerID = $repo->getPostOwner($postID);
 
-    $stmt = $conn->prepare("INSERT INTO comments (postID, userID, content) VALUES (?, ?, ?)");
-    $stmt->bind_param("iis", $postID, $userID, $content);
-    $ok = $stmt->execute();
-    $stmt->close();
+    $ok = $repo->addComment($postID, $userID, $content);
 
-    // Notify post owner (skip for own posts)
     if ($ok && $postOwnerID && $postOwnerID !== $userID) {
-        $notif = $conn->prepare(
-            "INSERT INTO notifications (userID, actor_id, type, post_id) VALUES (?, ?, 'comment', ?)"
-        );
-        if ($notif) {
-            $notif->bind_param("iii", $postOwnerID, $userID, $postID);
-            $notif->execute();
-            $notif->close();
-        }
+        $repo->addNotification($postOwnerID, $userID, 'comment', $postID);
     }
 
     $conn->close();
-    echo json_encode(['success' => $ok]);
+    if ($ok) {
+        echo json_encode(['status' => 'success', 'data' => []]);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Failed to add comment']);
+    }
     exit;
 }
 
-echo json_encode(['success' => false, 'error' => 'Invalid request']);
+echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
 ?>

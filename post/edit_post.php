@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/PostRepository.php';
 
 header('Content-Type: application/json');
 
@@ -24,15 +25,12 @@ if (!$postId || $caption === '') {
 }
 
 $conn = db_connect();
+$repo = new PostRepository($conn);
 
-$stmt = $conn->prepare('UPDATE posts SET caption = ? WHERE postID = ? AND userID = ?');
-$stmt->bind_param('sii', $caption, $postId, $userId);
-$ok = $stmt->execute();
-$affected = $stmt->affected_rows;
-$stmt->close();
+$ok = $repo->editPost($postId, $userId, $caption);
 $conn->close();
 
-if (!$ok || $affected === 0) {
+if (!$ok) {
     echo json_encode(['success' => false, 'error' => 'Post not found or not yours.']);
     exit;
 }

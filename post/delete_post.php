@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/PostRepository.php';
 
 header('Content-Type: application/json');
 
@@ -23,30 +24,19 @@ if (!$postId) {
 }
 
 $conn = db_connect();
+$repo = new PostRepository($conn);
 
-$stmt = $conn->prepare('DELETE FROM posts WHERE postID = ? AND userID = ?');
-$stmt->bind_param('ii', $postId, $userId);
-$ok = $stmt->execute();
-$affected = $stmt->affected_rows;
-$stmt->close();
+$ok = $repo->deletePost($postId, $userId);
 
-if ($ok && $affected > 0) {
+if ($ok) {
     $actorUsername = $_SESSION['user']['username'];
     $action = "User {$actorUsername} deleted their post #{$postId}";
-    $log = $conn->prepare(
-        "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
-         VALUES (?, ?, ?, 'post', ?, 'admin')"
-    );
-    if ($log) {
-        $log->bind_param('issi', $userId, $actorUsername, $action, $postId);
-        $log->execute();
-        $log->close();
-    }
+    $repo->logAuditAction($userId, $actorUsername, $action, $postId);
 }
 
 $conn->close();
 
-if (!$ok || $affected === 0) {
+if (!$ok) {
     echo json_encode(['success' => false, 'error' => 'Post not found or not yours.']);
     exit;
 }

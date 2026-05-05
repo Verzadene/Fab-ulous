@@ -12,127 +12,14 @@ if (empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-
 $userID = (int)$_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
 $name = $_SESSION['user']['name'];
 $role = $_SESSION['user']['role'] ?? 'user';
 $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 
-$hasFriendships = (bool)$conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
-$hasNotifs = (bool)$conn->query("SHOW TABLES LIKE 'notifications'")->num_rows;
 $myProfilePic = $_SESSION['user']['profile_pic'] ?? null;
 $myAvatarUrl = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
-
-if ($hasFriendships) {
-    $feedStmt = $conn->prepare("
-        SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
-               (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
-               (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
-               EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked
-        FROM posts p
-        JOIN accounts a ON p.userID = a.id
-        WHERE p.userID = ?
-           OR EXISTS(
-               SELECT 1 FROM friendships
-               WHERE status = 'accepted'
-                 AND ((requesterID = ? AND receiverID = p.userID)
-                   OR (receiverID = ? AND requesterID = p.userID))
-           )
-        ORDER BY p.created_at DESC
-        LIMIT 20
-    ");
-    $feedStmt->bind_param("iiii", $userID, $userID, $userID, $userID);
-    $feedStmt->execute();
-    $posts = $feedStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $feedStmt->close();
-
-    $discoverPosts = [];
-} else {
-    $feedStmt = $conn->prepare("
-        SELECT p.postID, p.caption, p.image_url, p.created_at,
-               a.id AS authorID, a.username AS author, a.profile_pic AS author_pic,
-               (SELECT COUNT(*) FROM likes WHERE postID = p.postID) AS like_count,
-               (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comment_count,
-               EXISTS(SELECT 1 FROM likes WHERE postID = p.postID AND userID = ?) AS user_liked
-        FROM posts p
-        JOIN accounts a ON p.userID = a.id
-        WHERE p.userID = ?
-        ORDER BY p.created_at DESC
-        LIMIT 20
-    ");
-    $feedStmt->bind_param("ii", $userID, $userID);
-    $feedStmt->execute();
-    $posts = $feedStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $feedStmt->close();
-    $discoverPosts = [];
-}
-
-$discoverPosts = [];
-
-$unreadCount = 0;
-if ($hasNotifs) {
-    $notifCountStmt = $conn->prepare("SELECT COUNT(*) AS c FROM notifications WHERE userID = ? AND is_read = 0");
-    $notifCountStmt->bind_param("i", $userID);
-    $notifCountStmt->execute();
-    $unreadCount = (int)$notifCountStmt->get_result()->fetch_assoc()['c'];
-    $notifCountStmt->close();
-}
-
-$friendDirectory = [];
-if ($hasFriendships) {
-    $friendDirStmt = $conn->prepare("
-        SELECT a.id,
-               CONCAT(a.first_name, ' ', a.last_name) AS name,
-               a.username,
-               COALESCE((
-                   SELECT status FROM friendships
-                   WHERE (requesterID = ? AND receiverID = a.id)
-                      OR (receiverID = ? AND requesterID = a.id)
-                   LIMIT 1
-               ), 'none') AS friend_status,
-               (SELECT friendshipID FROM friendships
-                WHERE (requesterID = ? AND receiverID = a.id)
-                   OR (receiverID = ? AND requesterID = a.id)
-                LIMIT 1) AS friendship_id,
-               (SELECT requesterID FROM friendships
-                WHERE (requesterID = ? AND receiverID = a.id)
-                   OR (receiverID = ? AND requesterID = a.id)
-                LIMIT 1) AS friend_requester
-        FROM accounts a
-        WHERE a.id != ? AND a.banned = 0
-        ORDER BY
-            CASE
-                WHEN EXISTS(
-                    SELECT 1 FROM friendships
-                    WHERE status = 'accepted'
-                      AND ((requesterID = ? AND receiverID = a.id)
-                        OR (receiverID = ? AND requesterID = a.id))
-                ) THEN 0
-                ELSE 1
-            END,
-            a.username ASC
-    ");
-    $friendDirStmt->bind_param(
-        "iiiiiiiii",
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID,
-        $userID
-    );
-    $friendDirStmt->execute();
-    $friendDirectory = $friendDirStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $friendDirStmt->close();
-}
-
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -242,137 +129,9 @@ $conn->close();
           </div>
         </div>
 
-        <?php if (empty($posts)): ?>
-          <div class="empty-feed">
-            <p>No posts from friends yet.</p>
-            <p class="empty-sub">Add friends from the right panel to start building your feed.</p>
-          </div>
-        <?php else: ?>
-          <?php foreach ($posts as $post): ?>
-            <?php $isOwnPost = ((int)$post['authorID'] === $userID); ?>
-            <div class="post-card" id="post-<?php echo $post['postID']; ?>">
-              <div class="post-header">
-                <div class="post-avatar">
-                  <?php if (!empty($post['author_pic'])): ?>
-                    <img src="../uploads/profile_pics/<?php echo rawurlencode($post['author_pic']); ?>" class="post-avatar-img" alt=""/>
-                  <?php else: ?>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
-                      <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
-                      <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
-                    </svg>
-                  <?php endif; ?>
-                </div>
-                <div class="post-meta">
-                  <span class="post-author"><?php echo htmlspecialchars($post['author']); ?></span>
-                  <span class="post-time"><?php echo date('M d, Y \a\t H:i', strtotime($post['created_at'])); ?></span>
-                </div>
-                <?php if ($isOwnPost): ?>
-                  <div class="post-own-actions">
-                    <button class="post-own-btn" onclick="openEditPost(<?php echo $post['postID']; ?>, <?php echo htmlspecialchars(json_encode($post['caption']), ENT_QUOTES); ?>)" title="Edit">&#9998;</button>
-                    <button class="post-own-btn post-own-delete" onclick="deletePost(<?php echo $post['postID']; ?>)" title="Delete">&#128465;</button>
-                  </div>
-                <?php endif; ?>
-              </div>
-
-              <?php if (!empty($post['caption'])): ?>
-                <p class="post-caption"><?php echo nl2br(htmlspecialchars($post['caption'])); ?></p>
-              <?php endif; ?>
-
-              <?php if (!empty($post['image_url'])): ?>
-                <img src="<?php echo htmlspecialchars($post['image_url']); ?>" class="post-image" alt="Post image"/>
-              <?php endif; ?>
-
-              <div class="post-actions">
-                <button class="post-action-btn like-btn <?php echo $post['user_liked'] ? 'liked' : ''; ?>" onclick="toggleLike(<?php echo $post['postID']; ?>, this)">
-                  <span class="heart-icon">&#10084;</span>
-                  <span class="like-count"><?php echo $post['like_count']; ?></span>
-                </button>
-                <button class="post-action-btn comment-toggle-btn" onclick="toggleComments(<?php echo $post['postID']; ?>)">
-                  <span>&#128172;</span>
-                  <span><?php echo $post['comment_count']; ?> Comment<?php echo (int)$post['comment_count'] !== 1 ? 's' : ''; ?></span>
-                </button>
-              </div>
-
-              <div class="comments-section" id="comments-<?php echo $post['postID']; ?>" style="display:none;">
-                <div class="comments-list" id="clist-<?php echo $post['postID']; ?>"></div>
-                <form class="comment-form" onsubmit="submitComment(event,<?php echo $post['postID']; ?>)">
-                  <input type="text" class="comment-input" placeholder="Write a comment..." maxlength="500" required/>
-                  <button type="submit" class="comment-submit">Post</button>
-                </form>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        <?php endif; ?>
-
-        <?php if (!empty($discoverPosts)): ?>
-          <div class="discover-heading">
-            <span>Discover People</span>
-          </div>
-          <?php foreach ($discoverPosts as $post): ?>
-            <?php
-              $fStatus = $post['friend_status'] ?? 'none';
-              $fID = (int)($post['friendship_id'] ?? 0);
-              $fRequester = (int)($post['friend_requester'] ?? 0);
-              $authorID = (int)$post['authorID'];
-            ?>
-            <div class="post-card discover-card" id="post-<?php echo $post['postID']; ?>">
-              <div class="post-header">
-                <div class="post-avatar">
-                  <?php if (!empty($post['author_pic'])): ?>
-                    <img src="../uploads/profile_pics/<?php echo rawurlencode($post['author_pic']); ?>" class="post-avatar-img" alt=""/>
-                  <?php else: ?>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42">
-                      <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
-                      <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
-                    </svg>
-                  <?php endif; ?>
-                </div>
-                <div class="post-meta">
-                  <span class="post-author"><?php echo htmlspecialchars($post['author']); ?></span>
-                  <span class="post-time"><?php echo date('M d, Y \a\t H:i', strtotime($post['created_at'])); ?></span>
-                </div>
-                <div class="friend-action" id="fa-<?php echo $authorID; ?>">
-                  <?php if ($fStatus === 'none'): ?>
-                    <button class="btn-add-friend" onclick="sendFriendRequest(<?php echo $authorID; ?>)">+ Add Friend</button>
-                  <?php elseif ($fStatus === 'pending' && $fRequester === $userID): ?>
-                    <button class="btn-friend-pending" onclick="cancelFriendRequest(<?php echo $fID; ?>, <?php echo $authorID; ?>)">Pending</button>
-                  <?php elseif ($fStatus === 'pending' && $fRequester !== $userID): ?>
-                    <button class="btn-accept-friend" onclick="acceptFriendRequest(<?php echo $fID; ?>, <?php echo $authorID; ?>)">Accept</button>
-                  <?php else: ?>
-                    <span class="friend-badge">&#10003; Friends</span>
-                  <?php endif; ?>
-                </div>
-              </div>
-
-              <?php if (!empty($post['caption'])): ?>
-                <p class="post-caption"><?php echo nl2br(htmlspecialchars($post['caption'])); ?></p>
-              <?php endif; ?>
-
-              <?php if (!empty($post['image_url'])): ?>
-                <img src="<?php echo htmlspecialchars($post['image_url']); ?>" class="post-image" alt="Post image"/>
-              <?php endif; ?>
-
-              <div class="post-actions">
-                <button class="post-action-btn like-btn <?php echo $post['user_liked'] ? 'liked' : ''; ?>" onclick="toggleLike(<?php echo $post['postID']; ?>, this)">
-                  <span class="heart-icon">&#10084;</span>
-                  <span class="like-count"><?php echo $post['like_count']; ?></span>
-                </button>
-                <button class="post-action-btn comment-toggle-btn" onclick="toggleComments(<?php echo $post['postID']; ?>)">
-                  <span>&#128172;</span>
-                  <span><?php echo $post['comment_count']; ?> Comment<?php echo (int)$post['comment_count'] !== 1 ? 's' : ''; ?></span>
-                </button>
-              </div>
-
-              <div class="comments-section" id="comments-<?php echo $post['postID']; ?>" style="display:none;">
-                <div class="comments-list" id="clist-<?php echo $post['postID']; ?>"></div>
-                <form class="comment-form" onsubmit="submitComment(event,<?php echo $post['postID']; ?>)">
-                  <input type="text" class="comment-input" placeholder="Write a comment..." maxlength="500" required/>
-                  <button type="submit" class="comment-submit">Post</button>
-                </form>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        <?php endif; ?>
+        <div id="feedContainer">
+          <p style="padding: 20px; text-align: center; color: #888;">Loading feed...</p>
+        </div>
       </main>
 
       <aside class="right-rail">
@@ -382,11 +141,7 @@ $conn->close();
               <p class="side-card-kicker">Updates</p>
               <h3 class="side-card-title notif-heading">
                 Notifications
-                <?php if ($unreadCount > 0): ?>
-                  <span class="notif-badge" id="notifBadge"><?php echo $unreadCount; ?></span>
-                <?php else: ?>
-                  <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
-                <?php endif; ?>
+                <span class="notif-badge" id="notifBadge" style="display:none;">0</span>
               </h3>
             </div>
             <button class="notif-mark-read" onclick="markAllRead()" title="Mark all read">&#10003;</button>
@@ -463,7 +218,7 @@ const friendsList = document.getElementById('friendsList');
 const friendResultsList = document.getElementById('friendResultsList');
 const friendCountPill = document.getElementById('friendCountPill');
 const myUserID = <?php echo (int)$userID; ?>;
-let friendDirectory = <?php echo json_encode($friendDirectory, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+let friendDirectory = [];
 
 function toggleDrawer(forceState) {
   const shouldOpen = typeof forceState === 'boolean'
@@ -572,6 +327,96 @@ function syncDiscoverFriendAction(authorID) {
   slot.innerHTML = renderDiscoverFriendButton(record);
 }
 
+async function loadFriendDirectory() {
+  try {
+    const response = await fetch('friends.php?action=list');
+    const data = await response.json();
+    if (data.success) {
+      friendDirectory = data.directory || [];
+      renderFriendsPanel();
+    }
+  } catch (error) {
+    console.error('Error loading friend directory:', error);
+  }
+}
+
+async function loadFeed() {
+  try {
+    const response = await fetch('feed_api.php');
+    const result = await response.json();
+    if (result.status === 'success') {
+      renderFeed(result.data.posts);
+    }
+  } catch (error) {
+    console.error('Error loading feed:', error);
+  }
+}
+
+function renderFeed(posts) {
+  const container = document.getElementById('feedContainer');
+  if (!posts || posts.length === 0) {
+    container.innerHTML = `
+      <div class="empty-feed">
+        <p>No posts from friends yet.</p>
+        <p class="empty-sub">Add friends from the right panel to start building your feed.</p>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = posts.map(post => {
+    const isOwnPost = Number(post.authorID) === myUserID;
+    const avatar = post.author_pic 
+      ? `<img src="../uploads/profile_pics/${encodeURIComponent(post.author_pic)}" class="post-avatar-img" alt=""/>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="42" height="42"><circle cx="50" cy="35" r="22" fill="#4E7A5E"/><ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/></svg>`;
+    
+    const dateObj = new Date(post.created_at.replace(/-/g, '/'));
+    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + 
+                    ' at ' + 
+                    dateObj.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+    let ownActions = isOwnPost ? `
+        <div class="post-own-actions">
+          <button class="post-own-btn" onclick="openEditPost(${post.postID}, decodeURIComponent('${encodeURIComponent(post.caption || '')}'))" title="Edit">&#9998;</button>
+          <button class="post-own-btn post-own-delete" onclick="deletePost(${post.postID})" title="Delete">&#128465;</button>
+        </div>` : '';
+
+    const captionHtml = post.caption ? `<p class="post-caption">${esc(post.caption).replace(/\\n/g, '<br>')}</p>` : '';
+    const imgHtml = post.image_url ? `<img src="${esc(post.image_url)}" class="post-image" alt="Post image"/>` : '';
+
+    return `
+      <div class="post-card" id="post-${post.postID}">
+        <div class="post-header">
+          <div class="post-avatar">${avatar}</div>
+          <div class="post-meta">
+            <span class="post-author">${esc(post.author)}</span>
+            <span class="post-time">${dateStr}</span>
+          </div>
+          ${ownActions}
+        </div>
+        ${captionHtml}
+        ${imgHtml}
+        <div class="post-actions">
+          <button class="post-action-btn like-btn ${post.user_liked ? 'liked' : ''}" onclick="toggleLike(${post.postID}, this)">
+            <span class="heart-icon">&#10084;</span>
+            <span class="like-count">${post.like_count}</span>
+          </button>
+          <button class="post-action-btn comment-toggle-btn" onclick="toggleComments(${post.postID})">
+            <span>&#128172;</span>
+            <span>${post.comment_count} Comment${Number(post.comment_count) !== 1 ? 's' : ''}</span>
+          </button>
+        </div>
+        <div class="comments-section" id="comments-${post.postID}" style="display:none;">
+          <div class="comments-list" id="clist-${post.postID}"></div>
+          <form class="comment-form" onsubmit="submitComment(event, ${post.postID})">
+            <input type="text" class="comment-input" placeholder="Write a comment..." maxlength="500" required/>
+            <button type="submit" class="comment-submit">Post</button>
+          </form>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function buildFriendRow(record, actionMarkup) {
   const safeName = esc(record.name);
   const safeUsername = esc(record.username);
@@ -660,9 +505,9 @@ async function toggleLike(postID, btn) {
       body: 'post_id=' + postID
     });
     const data = await response.json();
-    if (data.success) {
-      btn.querySelector('.like-count').textContent = data.like_count;
-      btn.classList.toggle('liked', data.liked);
+    if (data.status === 'success') {
+      btn.querySelector('.like-count').textContent = data.data.like_count;
+      btn.classList.toggle('liked', data.data.liked);
     }
   } catch (error) {
     console.error('Like error:', error);
@@ -684,8 +529,8 @@ async function loadComments(postID) {
     const data = await response.json();
     list.innerHTML = '';
 
-    if (data.comments && data.comments.length) {
-      data.comments.forEach(comment => {
+    if (data.status === 'success' && data.data.comments && data.data.comments.length) {
+      data.data.comments.forEach(comment => {
         const item = document.createElement('div');
         item.className = 'comment-item';
         item.innerHTML = `<span class="comment-author">${esc(comment.username)}</span> ${esc(comment.content)}`;
@@ -712,7 +557,7 @@ async function submitComment(event, postID) {
       body: 'post_id=' + postID + '&content=' + encodeURIComponent(content)
     });
     const data = await response.json();
-    if (data.success) {
+    if (data.status === 'success') {
       input.value = '';
       loadComments(postID);
     }
@@ -932,7 +777,8 @@ async function markAllRead() {
 
 friendSearchInput?.addEventListener('input', renderFriendsPanel);
 
-renderFriendsPanel();
+loadFriendDirectory();
+loadFeed();
 loadNotifications();
 setInterval(loadNotifications, 60000);
 

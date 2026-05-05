@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/MessageRepository.php';
 
 if (empty($_SESSION['user'])) {
     header('Location: ../login/login.php');
@@ -25,47 +26,8 @@ $selectedPersonId = (int) ($_GET['friend'] ?? 0);
 $myProfilePic     = $_SESSION['user']['profile_pic'] ?? null;
 $myAvatarUrl      = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
 
-// All non-banned accounts except self, with friendship status when available
-if ($hasFriendships) {
-    $contStmt = $conn->prepare(
-        "SELECT a.id,
-                CONCAT(a.first_name, ' ', a.last_name) AS name,
-                a.username,
-                a.profile_pic,
-                COALESCE((
-                    SELECT status FROM friendships
-                    WHERE (requesterID = ? AND receiverID = a.id)
-                       OR (receiverID = ? AND requesterID = a.id)
-                    LIMIT 1
-                ), 'none') AS friend_status
-         FROM accounts a
-         WHERE a.id != ? AND a.banned = 0
-         ORDER BY
-             CASE WHEN EXISTS(
-                 SELECT 1 FROM friendships
-                 WHERE status = 'accepted'
-                   AND ((requesterID = ? AND receiverID = a.id)
-                     OR (receiverID = ? AND requesterID = a.id))
-             ) THEN 0 ELSE 1 END,
-             a.username ASC"
-    );
-    $contStmt->bind_param('iiiii', $userId, $userId, $userId, $userId, $userId);
-} else {
-    $contStmt = $conn->prepare(
-        "SELECT a.id,
-                CONCAT(a.first_name, ' ', a.last_name) AS name,
-                a.username,
-                a.profile_pic,
-                'none' AS friend_status
-         FROM accounts a
-         WHERE a.id != ? AND a.banned = 0
-         ORDER BY a.username ASC"
-    );
-    $contStmt->bind_param('i', $userId);
-}
-$contStmt->execute();
-$contacts = $contStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$contStmt->close();
+$msgRepo = new MessageRepository($conn);
+$contacts = $msgRepo->getContacts($userId, $hasFriendships);
 
 $selectedContact = null;
 foreach ($contacts as $contact) {

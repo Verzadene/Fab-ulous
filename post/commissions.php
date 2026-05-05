@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/CommissionRepository.php';
 
 if (empty($_SESSION['user'])) {
     header('Location: ../login/login.php');
@@ -13,6 +14,7 @@ if (empty($_SESSION['mfa_verified'])) {
 }
 
 $conn    = db_connect();
+$commissionRepo = new CommissionRepository($conn);
 $userId  = (int) $_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
 $name    = $_SESSION['user']['name'];
@@ -39,6 +41,25 @@ if (isset($_GET['payment'])) {
     }
 }
 
+// ── GET: list commissions (JSON API) ──────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') {
+    header('Content-Type: application/json');
+    $commissions = $commissionRepo->getAllCommissions($isAdmin, $userId);
+    
+    $stats = ['total' => count($commissions), 'pending' => 0, 'active' => 0, 'completed' => 0, 'spent' => 0.0];
+    foreach ($commissions as $c) {
+        $stats['spent'] += (float) ($c['amount'] ?? 0);
+        $s = $c['status'] ?? '';
+        if ($s === 'Pending')   $stats['pending']++;
+        elseif (in_array($s, ['Accepted','Ongoing','Delayed'], true)) $stats['active']++;
+        elseif ($s === 'Completed') $stats['completed']++;
+    }
+    
+    echo json_encode(['success' => true, 'commissions' => $commissions, 'stats' => $stats]);
+    $conn->close();
+    exit;
+}
+
 // ── Admin POST: update commission status / note ──────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? '') === 'update_commission') {
     header('Content-Type: application/json');
@@ -55,20 +76,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
 
     $ownerId = 0;
     $previousStatus = '';
-    $existing = $conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
+    $existing = $commissionRepo->getCommissionById($commissionId);
     if ($existing) {
-        $existing->bind_param('i', $commissionId);
-        $existing->execute();
-        $existingRow = $existing->get_result()->fetch_assoc();
-        $existing->close();
-        $ownerId = (int) ($existingRow['userID'] ?? 0);
-        $previousStatus = (string) ($existingRow['status'] ?? '');
+        $ownerId = (int) ($existing['userID'] ?? 0);
+        $previousStatus = (string) ($existing['status'] ?? '');
     }
 
-    $upd = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
-    $upd->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
-    $ok = $upd->execute();
-    $upd->close();
+    $ok = $commissionRepo->updateCommission($commissionId, $status, $adminNote, $amount);
 
     if ($ok) {
         if ($ownerId > 0 && $previousStatus !== $status) {
@@ -77,15 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
         }
 
         $logAction = "Updated commission #{$commissionId} to {$status}";
-        $log = $conn->prepare(
-            "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
-             VALUES (?, ?, ?, 'commission', ?, 'admin')"
-        );
-        if ($log) {
-            $log->bind_param('issi', $userId, $username, $logAction, $commissionId);
-            $log->execute();
-            $log->close();
-        }
+        $commissionRepo->logAuditAction($userId, $username, $logAction, $commissionId);
     }
 
     $conn->close();
@@ -100,54 +106,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
 
 // ── User POST: submit new commission ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '') === 'submit_commission') {
+    header('Content-Type: application/json');
     $title       = mb_substr(trim($_POST['title'] ?? ''), 0, 255);
     $description = mb_substr(trim($_POST['description'] ?? ''), 0, 2000);
+    $error       = '';
+    $attachUrl   = null;
 
     if ($description === '') {
-        $pageMsg = 'Description is required.';
-        $pageMsgIsError = true;
+        $error = 'Description is required.';
     } else {
-        $attachUrl = null;
         if (!empty($_FILES['attachment']['name'])) {
             $file      = $_FILES['attachment'];
             $uploadErr = (int) ($file['error'] ?? UPLOAD_ERR_OK);
 
             if ($uploadErr !== UPLOAD_ERR_OK) {
-                $pageMsg = 'File upload failed. Please try again.';
-                $pageMsgIsError = true;
+                $error = 'File upload failed. Please try again.';
             } elseif ($file['size'] > 10 * 1024 * 1024) {
-                $pageMsg = 'Attachment must be smaller than 10 MB.';
-                $pageMsgIsError = true;
+                $error = 'Attachment must be smaller than 10 MB.';
             } else {
                 $finfo     = new finfo(FILEINFO_MIME_TYPE);
                 $mime      = $finfo->file($file['tmp_name']);
-                $allowedMimes = [
-                    'application/pdf'       => 'pdf',
-                    'model/stl'             => 'stl',
-                    'application/octet-stream' => null,
-                ];
 
                 $origName  = strtolower($file['name']);
                 $ext       = pathinfo($origName, PATHINFO_EXTENSION);
                 $allowedExts = ['pdf', 'stl'];
 
                 if (!in_array($ext, $allowedExts, true)) {
-                    $pageMsg = 'Only PDF and STL files are allowed.';
-                    $pageMsgIsError = true;
+                    $error = 'Only PDF and STL files are allowed.';
                 } elseif ($file['size'] === 0) {
-                    $pageMsg = 'The uploaded file is empty.';
-                    $pageMsgIsError = true;
+                    $error = 'The uploaded file is empty.';
                 } else {
                     $uploadDir = __DIR__ . '/../uploads/commissions/';
                     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-                        $pageMsg = 'Could not prepare upload folder.';
-                        $pageMsgIsError = true;
+                        $error = 'Could not prepare upload folder.';
                     } else {
                         $safeFilename = $userId . '_' . time() . '.' . $ext;
                         $destPath     = $uploadDir . $safeFilename;
                         if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                            $pageMsg = 'Failed to save attachment.';
-                            $pageMsgIsError = true;
+                            $error = 'Failed to save attachment.';
                         } else {
                             $attachUrl = 'uploads/commissions/' . $safeFilename;
                         }
@@ -155,111 +151,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
                 }
             }
         }
+    }
 
-        if (!$pageMsgIsError) {
-            $ins = $conn->prepare(
-                "INSERT INTO commissions (userID, commission_name, description, stl_file_url, status)
-                 VALUES (?, ?, ?, ?, 'Pending')"
-            );
-            $ins->bind_param('isss', $userId, $title, $description, $attachUrl);
-            $ok = $ins->execute();
-            $ins->close();
-
-            if ($ok) {
-                // Notify admins about new commission
-                $admins = $conn->query("SELECT id FROM accounts WHERE role IN ('admin','super_admin') AND banned = 0");
-                if ($admins) {
-                    $newId = (int) $conn->insert_id;
-                    $actorId = $userId;
-                    while ($admin = $admins->fetch_assoc()) {
-                        $adminId = (int) $admin['id'];
-                        if ($adminId !== $userId) {
-                            create_notification($conn, $adminId, $actorId, 'commission_submitted', null, $newId);
-                        }
-                    }
+    if ($error === '') {
+        $newId = $commissionRepo->createCommission($userId, $title, $description, $attachUrl);
+        if ($newId !== null) {
+            // Notify admins about new commission
+            $adminIds = $commissionRepo->getAdminIds();
+            foreach ($adminIds as $adminId) {
+                if ($adminId !== $userId) {
+                    create_notification($conn, $adminId, $userId, 'commission_submitted', null, $newId);
                 }
-
-                $pageMsg = 'Commission request submitted successfully!';
-            } else {
-                $pageMsg = 'Could not submit request. Please try again.';
-                $pageMsgIsError = true;
             }
+            echo json_encode(['success' => true, 'message' => 'Commission request submitted successfully!']);
+            $conn->close();
+            exit;
+        } else {
+            $error = 'Could not submit request. Please try again.';
         }
     }
+
+    echo json_encode(['success' => false, 'error' => $error]);
+    $conn->close();
+    exit;
 }
 
-// ── Detect available columns ─────────────────────────────────────
-$commissionColumns = [];
-$columnsResult = $conn->query('SHOW COLUMNS FROM commissions');
-while ($columnsResult && $column = $columnsResult->fetch_assoc()) {
-    $commissionColumns[$column['Field']] = true;
-}
-
-$titleExprAdmin = isset($commissionColumns['commission_name'])
-    ? "COALESCE(NULLIF(c.commission_name, ''), c.description)"
-    : (isset($commissionColumns['title'])
-        ? "COALESCE(NULLIF(c.title, ''), c.description)"
-        : 'c.description');
-
-$titleExprUser = isset($commissionColumns['commission_name'])
-    ? "COALESCE(NULLIF(commission_name, ''), description)"
-    : (isset($commissionColumns['title'])
-        ? "COALESCE(NULLIF(title, ''), description)"
-        : 'description');
-
-$noteColAdmin = isset($commissionColumns['admin_note']) ? 'c.admin_note' : "'' AS admin_note";
-$noteColUser  = isset($commissionColumns['admin_note']) ? 'admin_note'   : "'' AS admin_note";
-$attachColAdmin = isset($commissionColumns['stl_file_url']) ? 'c.stl_file_url AS attachment_url' : "'' AS attachment_url";
-$attachColUser  = isset($commissionColumns['stl_file_url']) ? 'stl_file_url AS attachment_url' : "'' AS attachment_url";
-$hasPaymentsTable = (bool) $conn->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
-$paymentColsAdmin = $hasPaymentsTable
-    ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = c.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
-         (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = c.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
-    : ", '' AS payment_status, NULL AS paid_at";
-$paymentColsUser = $hasPaymentsTable
-    ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
-         (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
-    : ", '' AS payment_status, NULL AS paid_at";
-
-if ($isAdmin) {
-    $stmt = $conn->prepare(
-        "SELECT c.commissionID, {$titleExprAdmin} AS title, c.description,
-                c.amount, c.status, c.created_at, {$noteColAdmin}, {$attachColAdmin},
-                a.username AS requester_username,
-                CONCAT(a.first_name, ' ', a.last_name) AS requester_name,
-                a.profile_pic AS requester_pic,
-                a.email AS requester_email
-                {$paymentColsAdmin}
-         FROM commissions c
-         JOIN accounts a ON c.userID = a.id
-         ORDER BY c.created_at DESC"
-    );
-    $stmt->execute();
-} else {
-    $stmt = $conn->prepare(
-        "SELECT commissionID, {$titleExprUser} AS title, description,
-                amount, status, created_at, {$noteColUser}, {$attachColUser}
-                {$paymentColsUser}
-         FROM commissions
-         WHERE userID = ?
-         ORDER BY created_at DESC"
-    );
-    $stmt->bind_param('i', $userId);
-    $stmt->execute();
-}
-
-$commissions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
 $conn->close();
-
-$stats = ['total' => count($commissions), 'pending' => 0, 'active' => 0, 'completed' => 0, 'spent' => 0.0];
-foreach ($commissions as $c) {
-    $stats['spent'] += (float) ($c['amount'] ?? 0);
-    $s = $c['status'] ?? '';
-    if ($s === 'Pending')   $stats['pending']++;
-    elseif (in_array($s, ['Accepted','Ongoing','Delayed'], true)) $stats['active']++;
-    elseif ($s === 'Completed') $stats['completed']++;
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -327,20 +244,21 @@ foreach ($commissions as $c) {
       </section>
 
       <?php if ($pageMsg): ?>
-        <div class="commission-page-msg <?php echo $pageMsgIsError ? 'commission-msg-error' : 'commission-msg-ok'; ?>">
+        <div id="commissionPageMsg" class="commission-page-msg <?php echo $pageMsgIsError ? 'commission-msg-error' : 'commission-msg-ok'; ?>">
           <?php echo htmlspecialchars($pageMsg); ?>
         </div>
+      <?php else: ?>
+        <div id="commissionPageMsg" class="commission-page-msg" style="display:none;"></div>
       <?php endif; ?>
 
       <section class="commission-stats">
-        <article class="commission-stat side-card"><span>Total Requests</span><strong><?php echo number_format($stats['total']); ?></strong></article>
-        <article class="commission-stat side-card"><span>Pending</span><strong><?php echo number_format($stats['pending']); ?></strong></article>
-        <article class="commission-stat side-card"><span>In Progress</span><strong><?php echo number_format($stats['active']); ?></strong></article>
-        <article class="commission-stat side-card"><span>Total Value</span><strong>&#8369;<?php echo number_format($stats['spent'], 2); ?></strong></article>
+        <article class="commission-stat side-card"><span>Total Requests</span><strong id="statTotal">0</strong></article>
+        <article class="commission-stat side-card"><span>Pending</span><strong id="statPending">0</strong></article>
+        <article class="commission-stat side-card"><span>In Progress</span><strong id="statActive">0</strong></article>
+        <article class="commission-stat side-card"><span>Total Value</span><strong id="statSpent">&#8369;0.00</strong></article>
       </section>
 
       <?php if (!$isAdmin): ?>
-      <!-- USER SUBMISSION FORM -->
       <section class="commission-submit-card side-card">
         <div class="commission-table-head">
           <div>
@@ -348,8 +266,7 @@ foreach ($commissions as $c) {
             <h2>Submit a Commission</h2>
           </div>
         </div>
-        <form method="POST" action="" enctype="multipart/form-data" class="commission-submit-form">
-          <input type="hidden" name="action" value="submit_commission"/>
+        <form id="submitCommissionForm" enctype="multipart/form-data" class="commission-submit-form" onsubmit="submitCommission(event)">
           <div class="commission-field">
             <label class="commission-label">Title <span class="commission-optional">(optional)</span></label>
             <input type="text" name="title" class="commission-input" placeholder="Short title for your request" maxlength="255"/>
@@ -373,146 +290,31 @@ foreach ($commissions as $c) {
             <p class="side-card-kicker">Updates</p>
             <h2>Recent Requests</h2>
           </div>
-          <span class="thread-badge"><?php echo number_format($stats['completed']); ?> Completed</span>
+          <span class="thread-badge" id="completedBadge">0 Completed</span>
         </div>
 
-        <?php if (empty($commissions)): ?>
-          <div class="messages-empty commission-empty">
-            <strong>No commission requests yet</strong>
-            <span><?php echo $isAdmin ? 'No commissions have been submitted yet.' : 'Use the form above to submit your first commission request.'; ?></span>
-          </div>
-        <?php else: ?>
-          <div class="commission-table-wrap">
-            <?php if ($isAdmin): ?>
-              <table class="commission-table">
-                <thead>
-                  <tr>
-                    <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
-                    <th>Status / Update</th><th>Amount</th><th>Payment</th><th>File</th><th>Submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($commissions as $c): ?>
-                    <?php $picUrl = !empty($c['requester_pic']) ? '../uploads/profile_pics/' . rawurlencode($c['requester_pic']) : null; ?>
-                    <tr>
-                      <td>#<?php echo (int) $c['commissionID']; ?></td>
-                      <td>
-                        <div style="display:flex;align-items:center;gap:8px;">
-                          <?php if ($picUrl): ?>
-                            <img src="<?php echo htmlspecialchars($picUrl); ?>" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" alt=""/>
-                          <?php endif; ?>
-                          <div>
-                            <strong><?php echo htmlspecialchars($c['requester_username'] ?? ''); ?></strong><br/>
-                            <small><?php echo htmlspecialchars($c['requester_name'] ?? ''); ?></small>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <a class="commission-file-link" href="mailto:<?php echo htmlspecialchars($c['requester_email'] ?? ''); ?>">
-                          <?php echo htmlspecialchars($c['requester_email'] ?? ''); ?>
-                        </a>
-                      </td>
-                      <td><?php echo htmlspecialchars($c['title'] ?: 'Untitled'); ?></td>
-                      <td class="commission-description"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 96)); ?></td>
-                      <td>
-                        <span class="status-badge status-<?php echo strtolower(str_replace([' '], ['-'], $c['status'])); ?>">
-                          <?php echo htmlspecialchars($c['status']); ?>
-                        </span>
-                        <form class="commission-form" onsubmit="saveCommission(event, <?php echo (int) $c['commissionID']; ?>)">
-                          <select name="commission_status" class="commission-select">
-                            <?php foreach ($allowedStatuses as $s): ?>
-                              <option value="<?php echo $s; ?>" <?php echo $c['status'] === $s ? 'selected' : ''; ?>><?php echo $s; ?></option>
-                            <?php endforeach; ?>
-                          </select>
-                          <textarea name="admin_note" class="commission-note" placeholder="Progress update / note"><?php echo htmlspecialchars($c['admin_note'] ?? ''); ?></textarea>
-                          <label class="commission-amount-label">
-                            Amount
-                            <input type="number" name="amount" class="commission-amount-input"
-                                   value="<?php echo htmlspecialchars(number_format((float)($c['amount'] ?? 0), 2, '.', '')); ?>"
-                                   min="0" step="0.01"/>
-                          </label>
-                          <button type="submit" class="action-btn btn-save">Save</button>
-                        </form>
-                      </td>
-                      <td class="commission-amount-cell">&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></td>
-                      <td>
-                        <?php if (($c['payment_status'] ?? '') === 'paid'): ?>
-                          <span class="payment-badge paid">Paid</span>
-                        <?php elseif (!empty($c['payment_status'])): ?>
-                          <span class="payment-badge pending"><?php echo htmlspecialchars(ucfirst($c['payment_status'])); ?></span>
-                        <?php else: ?>
-                          <span style="color:rgba(255,255,255,0.3);">—</span>
-                        <?php endif; ?>
-                      </td>
-                      <td>
-                        <?php if (!empty($c['attachment_url'])): ?>
-                          <a href="../<?php echo htmlspecialchars($c['attachment_url']); ?>" target="_blank" class="commission-file-link">&#128196; View</a>
-                        <?php else: ?>
-                          <span style="color:rgba(255,255,255,0.3);">—</span>
-                        <?php endif; ?>
-                      </td>
-                      <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            <?php else: ?>
-              <table class="commission-table">
-                <thead>
-                  <tr>
-                    <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
-                    <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>File</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($commissions as $c): ?>
-                    <tr>
-                      <td>#<?php echo (int) $c['commissionID']; ?></td>
-                      <td><?php echo htmlspecialchars($c['title'] ?: 'Untitled'); ?></td>
-                      <td class="commission-description"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 96)); ?></td>
-                      <td>
-                        <span class="status-badge status-<?php echo strtolower(str_replace([' '], ['-'], $c['status'])); ?>">
-                          <?php echo htmlspecialchars($c['status']); ?>
-                        </span>
-                      </td>
-                      <td>
-                        <div class="commission-pay-cell">
-                          <span>&#8369;<?php echo number_format((float) ($c['amount'] ?? 0), 2); ?></span>
-                          <?php if ((float)($c['amount'] ?? 0) > 0 && ($c['payment_status'] ?? '') !== 'paid'): ?>
-                            <form method="POST" action="paymongo_checkout.php">
-                              <input type="hidden" name="commission_id" value="<?php echo (int)$c['commissionID']; ?>"/>
-                              <button type="submit" class="commission-pay-btn">Pay</button>
-                            </form>
-                          <?php endif; ?>
-                        </div>
-                      </td>
-                      <td>
-                        <?php if (($c['payment_status'] ?? '') === 'paid'): ?>
-                          <span class="payment-badge paid">Paid</span>
-                        <?php elseif (!empty($c['payment_status'])): ?>
-                          <span class="payment-badge pending"><?php echo htmlspecialchars(ucfirst($c['payment_status'])); ?></span>
-                        <?php elseif ((float)($c['amount'] ?? 0) > 0): ?>
-                          <span class="payment-badge pending">Unpaid</span>
-                        <?php else: ?>
-                          <span style="color:rgba(255,255,255,0.3);">Awaiting amount</span>
-                        <?php endif; ?>
-                      </td>
-                      <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
-                      <td><?php echo htmlspecialchars($c['admin_note'] ?: 'No update yet.'); ?></td>
-                      <td>
-                        <?php if (!empty($c['attachment_url'])): ?>
-                          <a href="../<?php echo htmlspecialchars($c['attachment_url']); ?>" target="_blank" class="commission-file-link">&#128196; View</a>
-                        <?php else: ?>
-                          <span style="color:rgba(255,255,255,0.3);">—</span>
-                        <?php endif; ?>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
+        <div class="messages-empty commission-empty" id="emptyState" style="display:none;">
+          <strong>No commission requests yet</strong>
+          <span id="emptyStateMsg"></span>
+        </div>
+
+        <div class="commission-table-wrap" id="tableWrap" style="display:none;">
+          <table class="commission-table">
+            <thead>
+              <tr>
+                <?php if ($isAdmin): ?>
+                  <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
+                  <th>Status / Update</th><th>Amount</th><th>Payment</th><th>File</th><th>Submitted</th>
+                <?php else: ?>
+                  <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
+                  <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>File</th>
+                <?php endif; ?>
+              </tr>
+            </thead>
+            <tbody id="commissionsTableBody">
+            </tbody>
+          </table>
+        </div>
       </section>
 
     </div>
@@ -538,7 +340,177 @@ foreach ($commissions as $c) {
       if (event.key === 'Escape') closeDrawer();
     });
 
-    <?php if ($isAdmin): ?>
+    const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
+    const allowedStatuses = <?php echo json_encode($allowedStatuses); ?>;
+
+    function esc(val) {
+      const div = document.createElement('div');
+      div.textContent = String(val ?? '');
+      return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+      const d = new Date(dateStr.replace(/-/g, '/'));
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatMoney(amount) {
+      return '₱' + new Intl.NumberFormat('en-PH', {minimumFractionDigits: 2, maximumFractionDigits:2}).format(Number(amount));
+    }
+
+    async function loadCommissions() {
+      try {
+        const response = await fetch('commissions.php?action=list');
+        const data = await response.json();
+        if (data.success) {
+          updateStats(data.stats);
+          renderCommissions(data.commissions);
+        }
+      } catch (error) {
+        console.error('Error loading commissions:', error);
+      }
+    }
+
+    function updateStats(stats) {
+      document.getElementById('statTotal').textContent = new Intl.NumberFormat().format(stats.total);
+      document.getElementById('statPending').textContent = new Intl.NumberFormat().format(stats.pending);
+      document.getElementById('statActive').textContent = new Intl.NumberFormat().format(stats.active);
+      document.getElementById('statSpent').innerHTML = '&#8369;' + new Intl.NumberFormat('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}).format(stats.spent);
+      const badge = document.getElementById('completedBadge');
+      if (badge) badge.textContent = new Intl.NumberFormat().format(stats.completed) + ' Completed';
+    }
+
+    function renderCommissions(commissions) {
+      const tbody = document.getElementById('commissionsTableBody');
+      const emptyState = document.getElementById('emptyState');
+      const tableWrap = document.getElementById('tableWrap');
+
+      if (!commissions || commissions.length === 0) {
+        emptyState.style.display = 'flex';
+        document.getElementById('emptyStateMsg').textContent = isAdmin ? 'No commissions have been submitted yet.' : 'Use the form above to submit your first commission request.';
+        tableWrap.style.display = 'none';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+      tableWrap.style.display = 'block';
+
+      tbody.innerHTML = commissions.map(c => {
+        const title = esc(c.title || 'Untitled');
+        const desc = esc(c.description || '').substring(0, 96);
+        const statusClass = 'status-' + (c.status || '').toLowerCase().replace(/ /g, '-');
+        const amountNum = Number(c.amount || 0);
+        
+        let paymentHtml = '';
+        if (c.payment_status === 'paid') {
+          paymentHtml = '<span class="payment-badge paid">Paid</span>';
+        } else if (c.payment_status) {
+          paymentHtml = `<span class="payment-badge pending">${esc(c.payment_status.charAt(0).toUpperCase() + c.payment_status.slice(1))}</span>`;
+        }
+
+        let fileHtml = '<span style="color:rgba(255,255,255,0.3);">—</span>';
+        if (c.attachment_url) {
+          fileHtml = `<a href="../${esc(c.attachment_url)}" target="_blank" class="commission-file-link">&#128196; View</a>`;
+        }
+
+        if (isAdmin) {
+          const picUrl = c.requester_pic ? '../uploads/profile_pics/' + encodeURIComponent(c.requester_pic) : null;
+          const picHtml = picUrl ? `<img src="${esc(picUrl)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" alt=""/>` : '';
+          const statusOptions = allowedStatuses.map(s => `<option value="${s}" ${c.status === s ? 'selected' : ''}>${s}</option>`).join('');
+          
+          if (!paymentHtml) paymentHtml = '<span style="color:rgba(255,255,255,0.3);">—</span>';
+
+          return `
+            <tr>
+              <td>#${c.commissionID}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  ${picHtml}
+                  <div>
+                    <strong>${esc(c.requester_username)}</strong><br/>
+                    <small>${esc(c.requester_name)}</small>
+                  </div>
+                </div>
+              </td>
+              <td><a class="commission-file-link" href="mailto:${esc(c.requester_email)}">${esc(c.requester_email)}</a></td>
+              <td>${title}</td>
+              <td class="commission-description">${desc}</td>
+              <td>
+                <span class="status-badge ${statusClass}">${esc(c.status)}</span>
+                <form class="commission-form" onsubmit="saveCommission(event, ${c.commissionID})">
+                  <select name="commission_status" class="commission-select">${statusOptions}</select>
+                  <textarea name="admin_note" class="commission-note" placeholder="Progress update / note">${esc(c.admin_note)}</textarea>
+                  <label class="commission-amount-label">
+                    Amount
+                    <input type="number" name="amount" class="commission-amount-input" value="${amountNum.toFixed(2)}" min="0" step="0.01"/>
+                  </label>
+                  <button type="submit" class="action-btn btn-save">Save</button>
+                </form>
+              </td>
+              <td class="commission-amount-cell">${formatMoney(amountNum)}</td>
+              <td>${paymentHtml}</td>
+              <td>${fileHtml}</td>
+              <td>${formatDate(c.created_at)}</td>
+            </tr>
+          `;
+        } else {
+          let payCellHtml = `<span>${formatMoney(amountNum)}</span>`;
+          if (amountNum > 0 && c.payment_status !== 'paid') {
+             payCellHtml += `
+               <form method="POST" action="paymongo_checkout.php">
+                 <input type="hidden" name="commission_id" value="${c.commissionID}"/>
+                 <button type="submit" class="commission-pay-btn">Pay</button>
+               </form>
+             `;
+          }
+          if (!paymentHtml) {
+             paymentHtml = amountNum > 0 ? '<span class="payment-badge pending">Unpaid</span>' : '<span style="color:rgba(255,255,255,0.3);">Awaiting amount</span>';
+          }
+
+          return `
+            <tr>
+              <td>#${c.commissionID}</td>
+              <td>${title}</td>
+              <td class="commission-description">${desc}</td>
+              <td><span class="status-badge ${statusClass}">${esc(c.status)}</span></td>
+              <td><div class="commission-pay-cell">${payCellHtml}</div></td>
+              <td>${paymentHtml}</td>
+              <td>${formatDate(c.created_at)}</td>
+              <td>${esc(c.admin_note || 'No update yet.')}</td>
+              <td>${fileHtml}</td>
+            </tr>
+          `;
+        }
+      }).join('');
+    }
+
+    async function submitCommission(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      formData.append('action', 'submit_commission');
+
+      try {
+        const response = await fetch('commissions.php', { method: 'POST', body: formData });
+        const data = await response.json();
+        
+        const msgBox = document.getElementById('commissionPageMsg');
+        msgBox.style.display = 'block';
+        
+        if (data.success) {
+          msgBox.className = 'commission-page-msg commission-msg-ok';
+          msgBox.textContent = data.message;
+          form.reset();
+          loadCommissions();
+        } else {
+          msgBox.className = 'commission-page-msg commission-msg-error';
+          msgBox.textContent = data.error || 'Submission failed.';
+        }
+      } catch (error) {
+        console.error('Error submitting commission:', error);
+      }
+    }
+
     async function saveCommission(event, id) {
       event.preventDefault();
       const form = event.target;
@@ -549,19 +521,13 @@ foreach ($commissions as $c) {
         const r = await fetch('commissions.php', { method: 'POST', body: new URLSearchParams(data) });
         const json = await r.json();
         if (json.success) {
-          const badge = form.closest('tr').querySelector('.status-badge');
-          const amountCell = form.closest('tr').querySelector('.commission-amount-cell');
-          if (badge) {
-            badge.textContent = json.status;
-            badge.className = 'status-badge status-' + json.status.toLowerCase().replaceAll(' ', '-');
-          }
-          if (amountCell && json.amount_formatted) {
-            amountCell.textContent = json.amount_formatted;
-          }
+          loadCommissions();
         }
       } catch (e) { console.error(e); }
     }
-    <?php endif; ?>
+    
+    // Auto-load on init
+    loadCommissions();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

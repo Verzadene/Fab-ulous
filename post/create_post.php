@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/PostRepository.php';
 
 if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     header('Location: ../login/login.php');
@@ -33,10 +34,8 @@ if (empty($caption) && !$imageURL) {
     exit;
 }
 
-$stmt = $conn->prepare("INSERT INTO posts (userID, caption, image_url) VALUES (?, ?, ?)");
-$stmt->bind_param("iss", $userID, $caption, $imageURL);
-$stmt->execute();
-$stmt->close();
+$repo = new PostRepository($conn);
+$repo->createPost($userID, $caption, $imageURL);
 $conn->close();
 
 header('Location: post.php');
