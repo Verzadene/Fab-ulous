@@ -13,11 +13,11 @@ if (is_file($localConfig)) {
 // Google OAuth
 defined('GOOGLE_CLIENT_ID') || define(
     'GOOGLE_CLIENT_ID',
-    getenv('GOOGLE_CLIENT_ID') ?: '313306839766-5be832449af0f4lf0autei7oogm2ra5f.apps.googleusercontent.com'
+    getenv('GOOGLE_CLIENT_ID') ?: ''
 );
 defined('GOOGLE_CLIENT_SECRET') || define(
     'GOOGLE_CLIENT_SECRET',
-    getenv('GOOGLE_CLIENT_SECRET') ?: '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'
+    getenv('GOOGLE_CLIENT_SECRET') ?: ''
 );
 defined('GOOGLE_REDIRECT_URI') || define(
     'GOOGLE_REDIRECT_URI',
@@ -29,11 +29,11 @@ defined('APP_URL') || define('APP_URL', getenv('APP_URL') ?: 'http://localhost/F
 // PayMongo Checkout
 defined('PAYMONGO_SECRET_KEY') || define(
     'PAYMONGO_SECRET_KEY',
-    getenv('PAYMONGO_SECRET_KEY') ?: 'sk_test_vseYJkB7K2tVaQhRdyB39ZHa'
+    getenv('PAYMONGO_SECRET_KEY') ?: ''
 );
 defined('PAYMONGO_WEBHOOK_SECRET') || define(
     'PAYMONGO_WEBHOOK_SECRET',
-    getenv('PAYMONGO_WEBHOOK_SECRET') ?: 'http://localhost/post/paymongo_webhook.php'
+    getenv('PAYMONGO_WEBHOOK_SECRET') ?: ''
 );
 defined('PAYMONGO_API_BASE') || define('PAYMONGO_API_BASE', getenv('PAYMONGO_API_BASE') ?: 'https://api.paymongo.com/v1');
 defined('PAYMONGO_PAYMENT_METHOD_TYPES') || define('PAYMONGO_PAYMENT_METHOD_TYPES', getenv('PAYMONGO_PAYMENT_METHOD_TYPES') ?: 'card,gcash');
@@ -49,9 +49,9 @@ defined('DB_PORT') || define('DB_PORT', (int) (getenv('DB_PORT') ?: 3306));
 defined('SMTP_HOST') || define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com');
 defined('SMTP_PORT') || define('SMTP_PORT', (int) (getenv('SMTP_PORT') ?: 465));
 defined('SMTP_ENCRYPTION') || define('SMTP_ENCRYPTION', getenv('SMTP_ENCRYPTION') ?: 'ssl');
-defined('SMTP_USERNAME') || define('SMTP_USERNAME', getenv('SMTP_USERNAME') ?: 'fab.ulouslab.real@gmail.com');
-defined('SMTP_PASSWORD') || define('SMTP_PASSWORD', getenv('SMTP_PASSWORD') ?: 'lzhg hotg ojbi sujn');
-defined('MAIL_FROM_ADDRESS') || define('MAIL_FROM_ADDRESS', getenv('MAIL_FROM_ADDRESS') ?: 'fab.ulouslab.real@gmail.com');
+defined('SMTP_USERNAME') || define('SMTP_USERNAME', getenv('SMTP_USERNAME') ?: '');
+defined('SMTP_PASSWORD') || define('SMTP_PASSWORD', getenv('SMTP_PASSWORD') ?: '');
+defined('MAIL_FROM_ADDRESS') || define('MAIL_FROM_ADDRESS', getenv('MAIL_FROM_ADDRESS') ?: '');
 defined('MAIL_FROM_NAME') || define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'FABulous');
 
 // MFA
