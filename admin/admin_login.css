@@ -1,12 +1,13 @@
 /* ============================================
-   REGISTER.CSS — FABulous  (responsive)
+   ADMIN_LOGIN.CSS — FABulous
+   Standalone styles for the Admin Login page
    ============================================ */
 
 /* ---------- CSS Variables ---------- */
 :root {
   --bg-dark:       #25342B;
   --bg-card-dark:  #1E1E1E;
-  --panel-left:    #4E7A5E;
+  --panel-left:    #1a2820; /* Admin specific background */
   --panel-right:   #D9D9D9;
   --text-white:    #FFFFFF;
   --text-dark:     #25342B;
@@ -28,7 +29,7 @@ html, body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
-  background-color: var(--bg-dark);
+  background-color: var(--bg-dark) !important;
   font-family: var(--font-body);
   color: var(--text-white);
   display: flex;
@@ -56,13 +57,12 @@ html, body {
   object-fit: contain;
 }
 
-
 /* ---------- Page Controls ---------- */
 .page-controls {
   width: 100%;
   max-width: 840px;
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   padding: 90px 12px 16px;
 }
 
@@ -90,27 +90,27 @@ html, body {
 }
 
 .card-container {
-  width: min(760px, 95vw);
+  width: min(820px, 95vw);
+  min-height: 360px;
   display: flex;
   border-radius: var(--radius-card);
   overflow: hidden;
   box-shadow: 0 24px 64px rgba(0,0,0,0.45);
-  margin: 0;
+  margin: auto; /* FIX: Centers the card flawlessly within the flex slider */
   animation: cardFadeIn 0.6s ease-out forwards;
 }
 
 /* ---------- Left Panel ---------- */
 .left-panel {
-  width: 360px;
+  width: 380px;
   min-width: 280px;
   background-color: var(--panel-left);
-  padding: 32px 36px;
+  padding: 36px 38px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   position: relative;
 }
-
 
 .brand-logo-img {
   width: 48px;
@@ -119,7 +119,6 @@ html, body {
   object-fit: contain;
   flex-shrink: 0;
 }
-
 
 .brand-heading {
   font-family: var(--font-display);
@@ -151,6 +150,7 @@ html, body {
   height: 8px;
   border-radius: 50%;
   background: rgba(255,255,255,0.35);
+  transition: background 0.2s;
 }
 
 .dot.active { background: var(--text-white); }
@@ -159,17 +159,10 @@ html, body {
 .right-panel {
   flex: 1;
   background-color: var(--panel-right);
-  padding: 28px 36px;
+  padding: 36px 38px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.right-panel form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
+  gap: 18px;
 }
 
 .panel-title {
@@ -180,9 +173,22 @@ html, body {
   margin-bottom: 4px;
 }
 
-/* Server-side redirect error — hidden until JS sets display:block */
-.error-server {
-  display: none;
+/* ---------- Admin Badge ---------- */
+.admin-badge {
+  display: inline-block;
+  background: rgba(52,152,219,0.18);
+  color: #5dade2;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 999px;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  width: fit-content;
+}
+
+/* ---------- Error Message ---------- */
+.error-msg {
   color: #c0392b;
   font-size: 13px;
   font-weight: 600;
@@ -193,27 +199,24 @@ html, body {
   border-left: 3px solid #c0392b;
 }
 
-.prefill-notice {
-  color: #235236;
-  background: rgba(119,204,129,0.18);
-  border-left-color: #4e7a5e;
-}
-
-/* ---------- Name Row ---------- */
-.name-row {
-  display: flex;
-  gap: 10px;
+.auth-form {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  row-gap: 18px;
+  margin-top: 4px;
 }
-
-.input-group { width: 100%; }
-
-.input-group.half { width: calc(50% - 5px); flex-shrink: 0; }
 
 /* ---------- Inputs ---------- */
+.input-group {
+  width: 100%;
+  margin: 0;
+}
+
 .input-field {
   width: 100%;
-  height: 40px;
+  height: 42px;
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: var(--radius-input);
@@ -229,7 +232,56 @@ html, body {
 
 .input-field:focus {
   border-color: var(--panel-left);
-  box-shadow: 0 0 0 3px rgba(78,122,94,0.18);
+  box-shadow: 0 0 0 3px rgba(26, 40, 32, 0.18);
+}
+
+/* ---------- Show Password ---------- */
+.show-password-row {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin: 0;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-body);
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] { display: none; }
+
+.custom-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #aaa;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .custom-checkbox {
+  background: var(--panel-left);
+  border-color: var(--panel-left);
+}
+
+.checkbox-label input[type="checkbox"]:checked + .custom-checkbox::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translateY(-1px);
 }
 
 /* ---------- Primary Button ---------- */
@@ -244,8 +296,8 @@ html, body {
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  margin-top: 4px;
-  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 2px;
 }
 
 .btn-primary:hover {
@@ -258,85 +310,13 @@ html, body {
   box-shadow: none;
 }
 
-/* ---------- Bottom Links ---------- */
-.bottom-links {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 2px;
-}
-
-.bottom-text {
-  font-size: 13px;
-  color: #666;
-  text-align: center;
-}
-
-.link-btn {
-  background: transparent;
-  border: none;
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-dark);
-  cursor: pointer;
-  text-decoration: none;
-  transition: opacity 0.2s;
-  padding: 0;
-}
-
-.link-btn:hover { opacity: 0.65; text-decoration: underline; }
-
-/* ---------- Or Divider ---------- */
-.or-divider {
-  font-size: 13px;
-  color: #888;
-  text-align: center;
-  margin: 4px 0 0;
-}
-
-/* ---------- Google Button ---------- */
-.btn-google {
-  width: 100%;
-  height: 50px;
-  background: #EBEBEB;
-  border: 1px solid #CCCCCC;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #333333;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-}
-.btn-google:hover {
-  background: #d4d4d4;
-  color: #333333;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.15);
-}
-.btn-google:active { transform: scale(0.97); }
-
-.google-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
 /* ---------- Responsive ---------- */
 @media (max-width: 600px) {
   .card-container { flex-direction: column; }
-  .left-panel { width: 100%; min-width: unset; padding: 24px; min-height: 160px; }
+  .left-panel { width: 100%; min-width: unset; padding: 24px;}
   .carousel-dots { position: static; transform: none; margin-top: 12px; }
   .right-panel { padding: 24px; }
   .page-controls { padding: 84px 16px 12px; }
-  .name-row { flex-direction: column; }
-  .input-group.half { width: 100%; }
 }
 
 /* ---------- Auth Page Slider ---------- */
@@ -347,10 +327,12 @@ html, body {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  margin-top: 72px;
 }
 .auth-slider {
   display: flex;
   width: 100%;
+  height: 100%;
   flex: 1;
   transition: transform 0.4s ease-in-out;
   transform: translateX(0);
@@ -358,6 +340,7 @@ html, body {
 .auth-slider-step {
   flex: 0 0 100%;
   width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

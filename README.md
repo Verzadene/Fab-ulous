@@ -36,6 +36,7 @@ Fab-ulous/
 │   ├── admin.php                 # Main admin dashboard (user mgmt, commissions, audit log)
 │   ├── admin_login.php           # Admin credential + MFA entry point
 │   ├── admin_logout.php          # Session teardown for admin
+│   ├── admin_login.css           # Admin login standalone styles
 │   ├── admin.css                 # Admin dashboard styles
 │   └── commission_update.php     # AJAX endpoint: update commission status/notes from dashboard
 │
@@ -183,6 +184,52 @@ To prevent browser caching issues after an update, the backend appends a cache-b
 | `user` | Feed, messages, commissions, profile |
 | `admin` | All user access + admin dashboard (users, posts, commissions, audit log visible to all admins) |
 | `super_admin` | All admin access + promote/demote admins + see super_admin-only audit entries |
+
+---
+
+## Strangler Fig Pattern Migration
+
+FABulous is incrementally transitioning from a monolithic PHP application to microservices using the **Strangler Fig Pattern**. The strategy decouples frontend UI from backend business logic by gradually converting action scripts into RESTful JSON endpoints. Legacy endpoints continue to work during the transition.
+
+### Migration phases
+
+**Phase 0: Foundation (Current)**
+- No external services yet; focus on internal refactoring
+- Goal: Extract domain logic from scripts into reusable Repository classes
+- Benefit: Easier to stub out, mock, or replicate logic when building new services
+- Status: In progress
+  - `post/InteractionRepository.php` — Abstraction for likes and comments (planned)
+  - `like.php` / `comment.php` — Refactored to return JSON instead of redirects
+
+**Phase 1: Internal APIs (Planned)**
+- Publish Router/Gateway layer (e.g., `api/v1/router.php`)
+- All scripts return JSON; UI calls via AJAX
+- Status: Not started
+
+**Phase 2: External Microservices (Future)**
+- Extract first domain: Social Graph & Interactions (likes, comments, friendships)
+- Deploy as standalone Node.js/Python service
+- Gateway routes requests to internal PHP or external service
+
+**Phase 3: Domain-driven migration (Future)**
+- Migrate subsequent domains one at a time:
+  1. Social Graph & Interactions (likes, comments, friendships)
+  2. Notifications
+  3. Direct Messaging
+  4. Commission + Payment Processing
+  5. User Profile & Settings
+- Internal load balancing / health checks
+
+### Domains under transition
+
+| Domain | Scripts | Repository | API Status |
+|---|---|---|---|
+| Social Graph & Interactions | `post/like.php`, `post/comment.php` | `InteractionRepository.php` (planned) | JSON responses planned |
+| Notifications | `post/notifications.php` | `NotificationRepository.php` | Legacy |
+| Direct Messaging | `post/messages_api.php` | `MessageRepository.php` | Legacy |
+| Commissions | `post/commissions.php` | `CommissionRepository.php` | Legacy |
+| Profiles | `profile/profile.php` | — | Legacy |
+| Authentication | `login/login.php`, `admin/admin_login.php` | — | Legacy (critical — migrated last) |
 
 ---
 
