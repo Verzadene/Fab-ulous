@@ -18,8 +18,7 @@ $name = $_SESSION['user']['name'];
 $role = $_SESSION['user']['role'] ?? 'user';
 $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 
-$myProfilePic = $_SESSION['user']['profile_pic'] ?? null;
-$myAvatarUrl = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
+$myAvatarUrl = get_current_user_avatar();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -37,7 +36,7 @@ $myAvatarUrl = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProf
     <div class="drawer-profile">
       <div class="drawer-avatar">
         <?php if ($myAvatarUrl): ?>
-          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile"/>
+          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
         <?php else: ?>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
             <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
@@ -113,10 +112,14 @@ $myAvatarUrl = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProf
                 <div class="preview-card">
                   <div class="preview-header">
                     <div class="preview-avatar">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
-                        <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
-                        <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
-                      </svg>
+                      <?php if ($myAvatarUrl): ?>
+                        <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
+                      <?php else: ?>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="32" height="32">
+                          <circle cx="50" cy="35" r="22" fill="#4E7A5E"/>
+                          <ellipse cx="50" cy="85" rx="35" ry="25" fill="#4E7A5E"/>
+                        </svg>
+                      <?php endif; ?>
                     </div>
                     <p class="preview-author"><?php echo htmlspecialchars($username); ?></p>
                   </div>
@@ -275,6 +278,7 @@ function normalizeFriendRecord(record) {
     id: Number(record.id),
     name: String(record.name ?? '').trim() || String(record.username ?? ''),
     username: String(record.username ?? ''),
+    profile_pic: record.profile_pic ? String(record.profile_pic) : null,
     friend_status: String(record.friend_status ?? 'none'),
     friendship_id: record.friendship_id ? Number(record.friendship_id) : 0,
     friend_requester: record.friend_requester ? Number(record.friend_requester) : 0
@@ -421,11 +425,14 @@ function buildFriendRow(record, actionMarkup) {
   const safeName = esc(record.name);
   const safeUsername = esc(record.username);
   const initial = safeUsername.charAt(0).toUpperCase() || 'U';
+  const avatarHtml = record.profile_pic
+    ? `<img src="../uploads/profile_pics/${encodeURIComponent(record.profile_pic)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt=""/>`
+    : initial;
 
   return `
     <div class="friend-row">
       <div class="friend-person">
-        <div class="friend-avatar">${initial}</div>
+        <div class="friend-avatar">${avatarHtml}</div>
         <div class="friend-copy">
           <div class="friend-name">${safeName}</div>
           <div class="friend-handle">@${safeUsername}</div>

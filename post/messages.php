@@ -23,8 +23,8 @@ $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 $hasMessagesTable = (bool) $conn->query("SHOW TABLES LIKE 'messages'")->num_rows;
 $hasFriendships   = (bool) $conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
 $selectedPersonId = (int) ($_GET['friend'] ?? 0);
-$myProfilePic     = $_SESSION['user']['profile_pic'] ?? null;
-$myAvatarUrl      = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
+
+$myAvatarUrl = get_current_user_avatar();
 
 $msgRepo = new MessageRepository($conn);
 $contacts = $msgRepo->getContacts($userId, $hasFriendships);
@@ -56,7 +56,7 @@ $conn->close();
     <div class="drawer-profile">
       <div class="drawer-avatar">
         <?php if ($myAvatarUrl): ?>
-          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile"/>
+          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
         <?php else: ?>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
             <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>

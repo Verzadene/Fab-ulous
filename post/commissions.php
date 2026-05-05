@@ -20,8 +20,8 @@ $username = $_SESSION['user']['username'];
 $name    = $_SESSION['user']['name'];
 $role    = $_SESSION['user']['role'] ?? 'user';
 $isAdmin = in_array($role, ['admin', 'super_admin'], true);
-$myProfilePic = $_SESSION['user']['profile_pic'] ?? null;
-$myAvatarUrl  = $myProfilePic ? '../uploads/profile_pics/' . rawurlencode($myProfilePic) : null;
+
+$myAvatarUrl = get_current_user_avatar();
 
 $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
 
@@ -195,7 +195,7 @@ $conn->close();
     <div class="drawer-profile">
       <div class="drawer-avatar">
         <?php if ($myAvatarUrl): ?>
-          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile"/>
+          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
         <?php else: ?>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
             <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>

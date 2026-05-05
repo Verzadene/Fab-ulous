@@ -12,6 +12,7 @@ class FriendRepository {
             SELECT a.id,
                    CONCAT(a.first_name, ' ', a.last_name) AS name,
                    a.username,
+                   a.profile_pic,
                    COALESCE((
                        SELECT status FROM friendships
                        WHERE (requesterID = ? AND receiverID = a.id)
