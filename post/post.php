@@ -58,10 +58,6 @@ $myAvatarUrl = get_current_user_avatar();
 
   <nav class="topnav">
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
-    <div class="nav-links">
-      <a href="post.php" class="nav-item active">Home</a>
-      <a href="commissions.php" class="nav-item">Commissions</a>
-    </div>
     <button
       type="button"
       class="hamburger-btn"
@@ -70,6 +66,7 @@ $myAvatarUrl = get_current_user_avatar();
       aria-controls="navDrawer"
       aria-expanded="false"
       onclick="toggleDrawer()"
+      style="margin-left: auto;"
     >
       <span></span><span></span><span></span>
     </button>

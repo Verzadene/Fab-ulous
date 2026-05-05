@@ -215,14 +215,9 @@ $conn->close();
 
   <nav class="topnav">
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
-    <div class="nav-links">
-      <a href="post.php" class="nav-item">Home</a>
-      <a href="commissions.php" class="nav-item active">Commissions</a>
-      <a href="messages.php" class="nav-item">Messages</a>
-    </div>
     <button type="button" class="hamburger-btn" id="burgerBtn"
             aria-label="Toggle menu" aria-controls="navDrawer" aria-expanded="false"
-            onclick="toggleDrawer()">
+            onclick="toggleDrawer()" style="margin-left: auto;">
       <span></span><span></span><span></span>
     </button>
   </nav>

@@ -64,14 +64,6 @@ $myAvatarUrl = get_current_user_avatar();
   <!-- TOP NAV -->
   <nav class="topnav">
     <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
-    <div class="nav-links">
-      <a href="../post/post.php" class="nav-item">Home</a>
-      <a href="../post/commissions.php" class="nav-item">Commissions</a>
-      <a href="../post/messages.php" class="nav-item">Messages</a>
-      <?php if ($isAdmin): ?>
-        <a href="../admin/admin.php" class="nav-item nav-admin-link">Admin</a>
-      <?php endif; ?>
-    </div>
     <button
       type="button"
       class="hamburger-btn"
@@ -80,6 +72,7 @@ $myAvatarUrl = get_current_user_avatar();
       aria-controls="navDrawer"
       aria-expanded="false"
       onclick="toggleDrawer()"
+      style="margin-left: auto;"
     >
       <span></span><span></span><span></span>
     </button>
