@@ -21,6 +21,14 @@
     <a href="../landing/landing.html" class="ctrl-btn return-btn">&#8592; Return to Landing Page</a>
   </div>
 
+  <div class="auth-viewport">
+    <div class="auth-slider" id="authSlider" style="transform: translateX(-200%);">
+      <!-- Pos 0: Login -->
+      <div class="auth-slider-step"></div>
+      <!-- Pos 1: Admin -->
+      <div class="auth-slider-step"></div>
+      <!-- Pos 2: Register (Current) -->
+      <div class="auth-slider-step">
   <!-- Main Card -->
   <main class="card-container">
 
@@ -107,32 +115,9 @@
     </div>
 
   </main>
-
-  <!-- Show error from register.php redirect -->
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const error  = params.get('error');
-    const errDiv = document.getElementById('errorMsg');
-    if (error === 'email_taken') {
-      errDiv.textContent = 'This email is already registered. Please log in instead.';
-      errDiv.style.display = 'block';
-    } else if (error === 'username_taken') {
-      errDiv.textContent = 'This username is already taken. Please choose another.';
-      errDiv.style.display = 'block';
-    } else if (error === 'weak_password') {
-      errDiv.textContent = 'Password must be at least 16 characters and contain 2+ numbers and 2+ special characters.';
-      errDiv.style.display = 'block';
-    } else if (error === 'password_mismatch') {
-      errDiv.textContent = 'Passwords do not match. Please try again.';
-      errDiv.style.display = 'block';
-    } else if (error === 'smtp_not_configured') {
-      errDiv.textContent = 'Email verification is not configured. Contact the administrator.';
-      errDiv.style.display = 'block';
-    } else if (error === 'email_failed') {
-      errDiv.textContent = 'Could not send verification email. Please try again later.';
-      errDiv.style.display = 'block';
-    }
-  </script>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

@@ -145,6 +145,10 @@ $isLocked = $lockoutRemaining > 0;
     <a href="../admin/admin_login.php" class="ctrl-btn admin-btn">Admin &#8594;</a>
   </div>
 
+  <div class="auth-viewport">
+    <div class="auth-slider" id="authSlider">
+      <!-- Pos 0: Login (Current) -->
+      <div class="auth-slider-step">
   <main class="card-container">
 
     <div class="left-panel">
@@ -217,6 +221,15 @@ $isLocked = $lockoutRemaining > 0;
       </div>
     </div>
   </main>
+      </div>
+      <!-- Pos 1: Admin (Dummy) -->
+      <div class="auth-slider-step">
+      </div>
+      <!-- Pos 2: Register (Dummy) -->
+      <div class="auth-slider-step">
+      </div>
+    </div>
+  </div>
 
   <script>
     function togglePassword() {
@@ -242,6 +255,57 @@ $isLocked = $lockoutRemaining > 0;
         lockoutMsg.textContent = 'Too many failed attempts. Please wait ' + remaining + ' second' + (remaining !== 1 ? 's' : '') + '.';
       }, 1000);
     })();
+
+    // Page Transition Animation Logic
+    document.addEventListener('DOMContentLoaded', () => {
+      const slider = document.getElementById('authSlider');
+      if (!slider) return;
+
+      // Check if we arrived from another auth page
+      const slideFrom = sessionStorage.getItem('slideFrom');
+      if (slideFrom === 'admin') {
+        slider.style.transition = 'none';
+        slider.style.transform = 'translateX(-100%)';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            slider.style.transition = 'transform 0.4s ease-in-out';
+            slider.style.transform = 'translateX(0)';
+          });
+        });
+      } else if (slideFrom === 'register') {
+        slider.style.transition = 'none';
+        slider.style.transform = 'translateX(-200%)';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            slider.style.transition = 'transform 0.4s ease-in-out';
+            slider.style.transform = 'translateX(0)';
+          });
+        });
+      }
+      sessionStorage.removeItem('slideFrom');
+
+      // Intercept navigation to other auth pages
+      document.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', e => {
+          const href = link.getAttribute('href');
+          if (!href) return;
+
+          let targetPos = -1;
+          if (href.includes('admin_login.php')) targetPos = 1;
+          else if (href.includes('register.html')) targetPos = 2;
+
+          if (targetPos !== -1) {
+            e.preventDefault();
+            sessionStorage.setItem('slideFrom', 'login');
+            slider.style.transition = 'transform 0.4s ease-in-out';
+            slider.style.transform = `translateX(-${targetPos * 100}%)`;
+            setTimeout(() => {
+              window.location.href = link.href;
+            }, 400); // Wait for animation to finish
+          }
+        });
+      });
+    });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
