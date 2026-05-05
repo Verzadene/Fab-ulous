@@ -115,7 +115,7 @@ $isLocked = $lockoutRemaining > 0;
             <h1 class="brand-heading">Admin Access<br/>FABulous</h1>
             <p class="brand-desc">Restricted to authorized Fab Lab administrators only.</p>
             <div class="carousel-dots">
-              <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+              <span class="dot"></span><span class="dot active"></span><span class="dot"></span>
             </div>
           </div>
 

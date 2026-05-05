@@ -117,7 +117,7 @@ $conn->close();
         This also works for Google-linked accounts that want to set a local password.
       </p>
       <div class="carousel-dots">
-        <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+        <span class="dot active"></span><span class="dot active"></span><span class="dot"></span>
       </div>
     </div>
 

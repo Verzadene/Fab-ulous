@@ -111,7 +111,7 @@ $conn->close();
         Your account data stays intact.
       </p>
       <div class="carousel-dots">
-        <span class="dot active"></span><span class="dot"></span><span class="dot"></span>
+        <span class="dot active"></span><span class="dot active"></span><span class="dot active"></span>
       </div>
     </div>
 
