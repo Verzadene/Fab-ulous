@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/AdminRepository.php';
 
 // RBAC: admin and super_admin only
 $role = $_SESSION['user']['role'] ?? '';
@@ -20,6 +21,8 @@ $adminID       = (int)$_SESSION['user']['id'];
 $adminUsername = $_SESSION['user']['username'];
 $isSuperAdmin  = ($role === 'super_admin');
 
+$adminRepo = new AdminRepository($conn);
+
 // ── Handle POST Actions ──────────────────────────────────────────
 $actionMsg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
@@ -27,105 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $targetID = (int)($_POST['target_id'] ?? 0);
 
     if ($action === 'ban_user' && $targetID) {
-        $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
-        $upd = $conn->prepare("UPDATE accounts SET banned = 1 WHERE id = ? AND role IN $allowedRoles AND id != ?");
-        $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
-        $sel->bind_param("i", $targetID); $sel->execute();
-        $row = $sel->get_result()->fetch_assoc(); $sel->close();
-        $logAction = "Banned user: " . ($row['username'] ?? 'Unknown');
-        $vis = ($row['role'] ?? 'user') === 'user' ? 'admin' : 'super_admin';
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
-        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
-        $log->execute(); $log->close();
-        $actionMsg = "User banned.";
-    }
-
-    if ($action === 'unban_user' && $targetID) {
-        $upd = $conn->prepare("UPDATE accounts SET banned = 0 WHERE id = ? AND role IN ('user','admin','super_admin') AND id != ?");
-        $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
-        $sel->bind_param("i", $targetID); $sel->execute();
-        $row = $sel->get_result()->fetch_assoc(); $sel->close();
-        $logAction = "Unbanned user: " . ($row['username'] ?? 'Unknown');
-        $vis = in_array(($row['role'] ?? 'user'), ['admin', 'super_admin'], true) ? 'super_admin' : 'admin';
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
-        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
-        $log->execute(); $log->close();
-        $actionMsg = "User unbanned.";
-    }
-
-    if ($action === 'delete_post' && $targetID) {
-        $del = $conn->prepare("DELETE FROM posts WHERE postID = ?");
-        $del->bind_param("i", $targetID); $del->execute(); $del->close();
-        $logAction = "Admin removed post #$targetID";
-        $vis = 'admin';
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'post',?,?)");
-        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
-        $log->execute(); $log->close();
-        $actionMsg = "Post removed.";
-    }
-
-    // super_admin only: promote user → admin
-    if ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
-        $upd = $conn->prepare("UPDATE accounts SET role = 'admin' WHERE id = ? AND role = 'user'");
-        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
-        $sel->bind_param("i", $targetID); $sel->execute();
-        $row = $sel->get_result()->fetch_assoc(); $sel->close();
-        $logAction = "Promoted to admin: " . ($row['username'] ?? 'Unknown');
-        $vis = 'super_admin';
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
-        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
-        $log->execute(); $log->close();
-        $actionMsg = "User promoted to admin.";
-    }
-
-    // super_admin only: demote admin → user
-    if ($action === 'demote_to_user' && $targetID && $isSuperAdmin) {
-        $upd = $conn->prepare("UPDATE accounts SET role = 'user' WHERE id = ? AND role = 'admin'");
-        $upd->bind_param("i", $targetID); $upd->execute(); $upd->close();
-        $sel = $conn->prepare("SELECT username FROM accounts WHERE id = ?");
-        $sel->bind_param("i", $targetID); $sel->execute();
-        $row = $sel->get_result()->fetch_assoc(); $sel->close();
-        $logAction = "Demoted to user: " . ($row['username'] ?? 'Unknown');
-        $vis = 'super_admin';
-        $log = $conn->prepare("INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role) VALUES (?,?,?,'user',?,?)");
-        $log->bind_param("issis", $adminID, $adminUsername, $logAction, $targetID, $vis);
-        $log->execute(); $log->close();
-        $actionMsg = "Admin demoted to user.";
-    }
-
-    // Update commission status / admin note
-    if ($action === 'update_commission' && $targetID) {
+        $actionMsg = $adminRepo->processBanUser($targetID, $adminID, $adminUsername, $isSuperAdmin);
+    } elseif ($action === 'unban_user' && $targetID) {
+        $actionMsg = $adminRepo->processUnbanUser($targetID, $adminID, $adminUsername);
+    } elseif ($action === 'delete_post' && $targetID) {
+        $actionMsg = $adminRepo->processDeletePost($targetID, $adminID, $adminUsername);
+    } elseif ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
+        $actionMsg = $adminRepo->processPromoteToAdmin($targetID, $adminID, $adminUsername);
+    } elseif ($action === 'demote_to_user' && $targetID && $isSuperAdmin) {
+        $actionMsg = $adminRepo->processDemoteToUser($targetID, $adminID, $adminUsername);
+    } elseif ($action === 'update_commission' && $targetID) {
         $newStatus = $_POST['commission_status'] ?? '';
-        $adminNote = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
-        $amount = max(0, round((float)($_POST['amount'] ?? 0), 2));
-        $allowedStatuses = ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled'];
-        if (in_array($newStatus, $allowedStatuses, true)) {
-            $ownerId = 0;
-            $previousStatus = '';
-            $existing = $conn->prepare("SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1");
-            if ($existing) {
-                $existing->bind_param("i", $targetID);
-                $existing->execute();
-                $existingRow = $existing->get_result()->fetch_assoc();
-                $existing->close();
-                $ownerId = (int)($existingRow['userID'] ?? 0);
-                $previousStatus = (string)($existingRow['status'] ?? '');
-            }
-
-            $upd = $conn->prepare("UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?");
-            if ($upd) {
-                $upd->bind_param("ssdi", $newStatus, $adminNote, $amount, $targetID);
-                $upd->execute(); $upd->close();
-                if ($ownerId > 0 && $previousStatus !== $newStatus) {
-                    $notifType = $newStatus === 'Accepted' ? 'commission_approved' : 'commission_updated';
-                    create_notification($conn, $ownerId, $adminID, $notifType, null, $targetID);
-                }
-                $actionMsg = "Commission #$targetID updated.";
-            }
-        }
+        $adminNote = $_POST['admin_note'] ?? '';
+        $amount = (float)($_POST['amount'] ?? 0);
+        $actionMsg = $adminRepo->processUpdateCommission($targetID, $adminID, $newStatus, $adminNote, $amount);
     }
 
     header('Location: admin.php?msg=' . urlencode($actionMsg));
@@ -134,74 +52,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 if (isset($_GET['msg'])) $actionMsg = htmlspecialchars($_GET['msg']);
 
 // ── Dashboard Metrics ────────────────────────────────────────────
-$activeProjects = (int)$conn->query("SELECT COUNT(*) AS c FROM posts")->fetch_assoc()['c'];
-$totalUsers     = (int)$conn->query("SELECT COUNT(*) AS c FROM accounts WHERE role='user'")->fetch_assoc()['c'];
-
-$engRow = $conn->query("
-    SELECT ((SELECT COUNT(*) FROM likes)+(SELECT COUNT(*) FROM comments)) AS i,
-           (SELECT COUNT(*) FROM posts) AS p
-")->fetch_assoc();
-$engagementRate = $engRow['p'] > 0 ? round($engRow['i'] / $engRow['p'], 2) : 0;
-
-$revRow = $conn->query("SELECT COALESCE(SUM(amount),0) AS t FROM commissions WHERE status='Completed'")->fetch_assoc();
-$revenueSales = number_format((float)$revRow['t'], 2);
+$metrics = $adminRepo->getDashboardMetrics();
+$activeProjects = $metrics['activeProjects'];
+$totalUsers     = $metrics['totalUsers'];
+$engagementRate = $metrics['engagementRate'];
+$revenueSales   = $metrics['revenueSales'];
 
 // ── Order Pipeline ───────────────────────────────────────────────
-$pipeline = ['Pending' => 0, 'Accepted' => 0, 'Ongoing' => 0, 'Delayed' => 0, 'Completed' => 0, 'Cancelled' => 0];
-$pRes = $conn->query("SELECT status, COUNT(*) AS c FROM commissions GROUP BY status");
-if ($pRes) while ($r = $pRes->fetch_assoc()) { if (array_key_exists($r['status'], $pipeline)) $pipeline[$r['status']] = (int)$r['c']; }
+$pipeline = $adminRepo->getOrderPipeline();
 
 // ── Live Audit Log (visibility-filtered) ────────────────────────
-$auditLogs = [];
-$auditFilter = $isSuperAdmin ? '' : "WHERE visibility_role = 'admin'";
-$aRes = $conn->query("SELECT admin_username, action, created_at FROM audit_log {$auditFilter} ORDER BY created_at DESC LIMIT 8");
-if ($aRes) while ($r = $aRes->fetch_assoc()) $auditLogs[] = $r;
+$auditLogs = $adminRepo->getAuditLogs($isSuperAdmin);
 
 // ── User List ────────────────────────────────────────────────────
-$users = [];
-$uRes = $conn->query("SELECT id, first_name, last_name, username, email, role, banned, created_at FROM accounts ORDER BY created_at DESC");
-if ($uRes) while ($r = $uRes->fetch_assoc()) $users[] = $r;
+$users = $adminRepo->getAllUsers();
 
 // ── All Posts (Feed Moderator) ───────────────────────────────────
-$allPosts = [];
-$fpRes = $conn->query("
-    SELECT p.postID, p.caption, p.created_at, a.username,
-           (SELECT COUNT(*) FROM likes    WHERE postID = p.postID) AS likes,
-           (SELECT COUNT(*) FROM comments WHERE postID = p.postID) AS comments
-    FROM posts p JOIN accounts a ON p.userID = a.id
-    ORDER BY p.created_at DESC
-");
-if ($fpRes) while ($r = $fpRes->fetch_assoc()) $allPosts[] = $r;
+$allPosts = $adminRepo->getAllPosts();
 
 // ── Commissions ──────────────────────────────────────────────────
-$commissions = [];
-$commissionColumns = [];
-$colRes = $conn->query("SHOW COLUMNS FROM commissions");
-if ($colRes) {
-    while ($col = $colRes->fetch_assoc()) {
-        $commissionColumns[$col['Field']] = true;
-    }
-}
-
-$hasAdminNote = isset($commissionColumns['admin_note']);
-$noteCol = $hasAdminNote ? ', c.admin_note' : ", '' AS admin_note";
-
-if (isset($commissionColumns['commission_name'])) {
-    $titleExpr = "COALESCE(NULLIF(c.commission_name, ''), c.description)";
-} elseif (isset($commissionColumns['title'])) {
-    $titleExpr = "COALESCE(NULLIF(c.title, ''), c.description)";
-} else {
-    $titleExpr = "c.description";
-}
-
-$cRes = $conn->query("
-    SELECT c.commissionID, $titleExpr AS title, c.description, c.amount, c.status, c.created_at$noteCol,
-           a.username AS requester, a.email AS requester_email
-    FROM commissions c
-    LEFT JOIN accounts a ON c.userID = a.id
-    ORDER BY c.created_at DESC
-");
-if ($cRes) while ($r = $cRes->fetch_assoc()) $commissions[] = $r;
+$commissions = $adminRepo->getAllCommissions();
 
 $conn->close();
 ?>
