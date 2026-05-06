@@ -436,3 +436,66 @@ html, body {
   .admin-table td { color: #333; border-color: #ddd; }
   .bottom-row   { display: flex; flex-wrap: wrap; }
 }
+
+/* ── Admin Filters ── */
+.admin-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--sidebar-bg);
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-filters input[type="text"],
+.admin-filters input[type="date"] {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-white);
+  outline: none;
+  transition: border-color 0.18s, background 0.18s;
+  /* date picker icon tint for Webkit */
+  color-scheme: dark;
+}
+
+.admin-filters input[type="text"]::placeholder {
+  color: var(--text-muted);
+}
+
+.admin-filters input[type="text"]:focus,
+.admin-filters input[type="date"]:focus {
+  border-color: var(--green-accent);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.admin-filters label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
+.admin-filters label input[type="checkbox"] {
+  accent-color: var(--green-active);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* Print — hide filters from printed output */
+@media print {
+  .admin-filters { display: none !important; }
+}

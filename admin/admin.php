@@ -188,8 +188,15 @@ $conn->close();
     <!-- ── USER MANAGEMENT TAB ── -->
     <div id="tab-users" class="tab-content">
       <h2 class="section-heading">User Management</h2>
+      
+      <div class="admin-filters">
+        <input type="text" id="filterUsersText" placeholder="Search by name, username, email..." oninput="filterUsers()" style="flex: 1; min-width: 200px;">
+        <input type="date" id="filterUsersStart" onchange="filterUsers()" title="Start Date">
+        <input type="date" id="filterUsersEnd" onchange="filterUsers()" title="End Date">
+      </div>
+
       <div class="table-wrap">
-        <table class="admin-table">
+        <table class="admin-table" id="usersTable">
           <thead>
             <tr>
               <th>ID</th><th>Name</th><th>Username</th><th>Email</th>
@@ -208,8 +215,13 @@ $conn->close();
                 $canBan      = !$isSelf && !$u['banned'] && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
                 $canPromote  = $isSuperAdmin && $uRole === 'user';
                 $canDemote   = $isSuperAdmin && $isAdminTgt && !$isSelf;
+                
+                $searchString = htmlspecialchars(strtolower($u['username'] . ' ' . $u['first_name'] . ' ' . $u['last_name'] . ' ' . $u['email']));
+                $dateString = date('Y-m-d', strtotime($u['created_at']));
               ?>
-              <tr class="<?php echo $u['banned'] ? 'banned-row' : ''; ?>">
+              <tr class="<?php echo $u['banned'] ? 'banned-row' : ''; ?>" 
+                  data-search="<?php echo $searchString; ?>" 
+                  data-date="<?php echo $dateString; ?>">
                 <td><?php echo $u['id']; ?></td>
                 <td><?php echo htmlspecialchars($u['first_name'].' '.$u['last_name']); ?></td>
                 <td><?php echo htmlspecialchars($u['username']); ?></td>
@@ -261,8 +273,16 @@ $conn->close();
     <!-- ── FEED MODERATOR TAB ── -->
     <div id="tab-feed" class="tab-content">
       <h2 class="section-heading">Feed Moderator</h2>
+      
+      <div class="admin-filters">
+        <input type="text" id="filterFeedText" placeholder="Search by username or caption..." oninput="filterFeed()" style="flex: 1; min-width: 200px;">
+        <label><input type="checkbox" id="filterFeedHasCaption" onchange="filterFeed()"> Must have caption</label>
+        <input type="date" id="filterFeedStart" onchange="filterFeed()" title="Start Date">
+        <input type="date" id="filterFeedEnd" onchange="filterFeed()" title="End Date">
+      </div>
+
       <div class="table-wrap">
-        <table class="admin-table">
+        <table class="admin-table" id="feedTable">
           <thead>
             <tr>
               <th>Post ID</th><th>Author</th><th>Caption</th>
@@ -271,15 +291,20 @@ $conn->close();
           </thead>
           <tbody>
             <?php if (empty($allPosts)): ?>
-              <tr><td colspan="7" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No posts yet.</td></tr>
+              <tr class="empty-row"><td colspan="7" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No posts yet.</td></tr>
             <?php else: ?>
               <?php foreach ($allPosts as $p): ?>
-                <tr>
+                <?php 
+                  $caption = $p['caption'] ?? '';
+                  $searchString = htmlspecialchars(strtolower($p['username'] . ' ' . $caption));
+                  $dateString = date('Y-m-d', strtotime($p['created_at']));
+                  $hasCaption = trim($caption) !== '' ? '1' : '0';
+                ?>
+                <tr data-search="<?php echo $searchString; ?>" data-date="<?php echo $dateString; ?>" data-has-caption="<?php echo $hasCaption; ?>">
                   <td>#<?php echo $p['postID']; ?></td>
                   <td><?php echo htmlspecialchars($p['username']); ?></td>
                   <td class="caption-cell caption-cell-expanded">
                     <?php
-                      $caption = $p['caption'] ?? '';
                       $shortCaption = mb_substr($caption, 0, 90);
                       $captionIsLong = mb_strlen($caption) > 90;
                     ?>
@@ -314,8 +339,15 @@ $conn->close();
     <!-- ── COMMISSIONS TAB ── -->
     <div id="tab-commissions" class="tab-content">
       <h2 class="section-heading">Commission Management</h2>
+      
+      <div class="admin-filters">
+        <input type="text" id="filterCommText" placeholder="Search requester, title, description..." oninput="filterCommissions()" style="flex: 1; min-width: 200px;">
+        <input type="date" id="filterCommStart" onchange="filterCommissions()" title="Start Date">
+        <input type="date" id="filterCommEnd" onchange="filterCommissions()" title="End Date">
+      </div>
+
       <div class="table-wrap">
-        <table class="admin-table commissions-table">
+        <table class="admin-table commissions-table" id="commTable">
           <thead>
             <tr>
               <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
@@ -324,10 +356,14 @@ $conn->close();
           </thead>
           <tbody>
             <?php if (empty($commissions)): ?>
-              <tr><td colspan="10" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+              <tr class="empty-row"><td colspan="10" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
             <?php else: ?>
               <?php foreach ($commissions as $c): ?>
-                <tr>
+                <?php 
+                  $searchString = htmlspecialchars(strtolower(($c['requester'] ?? '') . ' ' . ($c['title'] ?? '') . ' ' . ($c['description'] ?? '')));
+                  $dateString = date('Y-m-d', strtotime($c['created_at']));
+                ?>
+                <tr data-search="<?php echo $searchString; ?>" data-date="<?php echo $dateString; ?>">
                   <td>#<?php echo $c['commissionID']; ?></td>
                   <td><?php echo htmlspecialchars($c['requester'] ?? '—'); ?></td>
                   <td>
@@ -407,6 +443,44 @@ function showActionMessage(message, isError = false) {
   liveActionMsg.style.borderColor = isError ? '#e74c3c' : '';
   liveActionMsg.style.color = isError ? '#ff8a8a' : '';
   liveActionMsg.style.background = isError ? 'rgba(231,76,60,0.12)' : '';
+}
+
+// Filter Logic
+function applyFilters(tableId, textId, startId, endId, extraLogic = null) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const rows = table.querySelectorAll('tbody tr:not(.empty-row)');
+  const text = document.getElementById(textId).value.toLowerCase().trim();
+  const start = document.getElementById(startId).value;
+  const end = document.getElementById(endId).value;
+
+  rows.forEach(row => {
+    const searchData = row.getAttribute('data-search') || '';
+    const dateData = row.getAttribute('data-date') || '';
+
+    const matchText = text === '' || searchData.includes(text);
+    const matchStart = start === '' || dateData >= start;
+    const matchEnd = end === '' || dateData <= end;
+    const matchExtra = extraLogic ? extraLogic(row) : true;
+
+    row.style.display = (matchText && matchStart && matchEnd && matchExtra) ? '' : 'none';
+  });
+}
+
+function filterUsers() {
+  applyFilters('usersTable', 'filterUsersText', 'filterUsersStart', 'filterUsersEnd');
+}
+
+function filterFeed() {
+  const hasCaptionObj = document.getElementById('filterFeedHasCaption');
+  applyFilters('feedTable', 'filterFeedText', 'filterFeedStart', 'filterFeedEnd', (row) => {
+    if (hasCaptionObj.checked) return row.getAttribute('data-has-caption') === '1';
+    return true;
+  });
+}
+
+function filterCommissions() {
+  applyFilters('commTable', 'filterCommText', 'filterCommStart', 'filterCommEnd');
 }
 
 function statusClassName(status) {
