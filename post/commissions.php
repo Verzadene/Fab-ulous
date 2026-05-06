@@ -44,18 +44,9 @@ if (isset($_GET['payment'])) {
 // ── GET: list commissions (JSON API) ──────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') {
     header('Content-Type: application/json');
-    $commissions = $commissionRepo->getAllCommissions($isAdmin, $userId);
+    $data = $commissionRepo->getCommissionsWithStats($isAdmin, $userId);
     
-    $stats = ['total' => count($commissions), 'pending' => 0, 'active' => 0, 'completed' => 0, 'spent' => 0.0];
-    foreach ($commissions as $c) {
-        $stats['spent'] += (float) ($c['amount'] ?? 0);
-        $s = $c['status'] ?? '';
-        if ($s === 'Pending')   $stats['pending']++;
-        elseif (in_array($s, ['Accepted','Ongoing','Delayed'], true)) $stats['active']++;
-        elseif ($s === 'Completed') $stats['completed']++;
-    }
-    
-    echo json_encode(['success' => true, 'commissions' => $commissions, 'stats' => $stats]);
+    echo json_encode(array_merge(['success' => true], $data));
     $conn->close();
     exit;
 }
@@ -64,115 +55,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? '') === 'update_commission') {
     header('Content-Type: application/json');
     $commissionId = (int) ($_POST['target_id'] ?? 0);
-    $status       = trim($_POST['commission_status'] ?? '');
-    $adminNote    = mb_substr(trim($_POST['admin_note'] ?? ''), 0, 500);
-    $amount       = max(0, round((float) ($_POST['amount'] ?? 0), 2));
+    $status       = $_POST['commission_status'] ?? '';
+    $adminNote    = $_POST['admin_note'] ?? '';
+    $amount       = (float) ($_POST['amount'] ?? 0);
 
-    if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid data.']);
-        $conn->close();
-        exit;
-    }
-
-    $ownerId = 0;
-    $previousStatus = '';
-    $existing = $commissionRepo->getCommissionById($commissionId);
-    if ($existing) {
-        $ownerId = (int) ($existing['userID'] ?? 0);
-        $previousStatus = (string) ($existing['status'] ?? '');
-    }
-
-    $ok = $commissionRepo->updateCommission($commissionId, $status, $adminNote, $amount);
-
-    if ($ok) {
-        if ($ownerId > 0 && $previousStatus !== $status) {
-            $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
-            create_notification($conn, $ownerId, $userId, $notifType, null, $commissionId);
-        }
-
-        $logAction = "Updated commission #{$commissionId} to {$status}";
-        $commissionRepo->logAuditAction($userId, $username, $logAction, $commissionId);
-    }
+    $result = $commissionRepo->processUpdateCommission($commissionId, $status, $adminNote, $amount, $userId, $username, $allowedStatuses);
 
     $conn->close();
-    echo json_encode([
-        'success' => $ok,
-        'status' => $status,
-        'amount' => $amount,
-        'amount_formatted' => '₱' . number_format($amount, 2),
-    ]);
+    echo json_encode($result);
     exit;
 }
 
 // ── User POST: submit new commission ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '') === 'submit_commission') {
     header('Content-Type: application/json');
-    $title       = mb_substr(trim($_POST['title'] ?? ''), 0, 255);
-    $description = mb_substr(trim($_POST['description'] ?? ''), 0, 2000);
-    $error       = '';
-    $attachUrl   = null;
+    $title       = $_POST['title'] ?? '';
+    $description = $_POST['description'] ?? '';
+    $file        = $_FILES['attachment'] ?? null;
 
-    if ($description === '') {
-        $error = 'Description is required.';
-    } else {
-        if (!empty($_FILES['attachment']['name'])) {
-            $file      = $_FILES['attachment'];
-            $uploadErr = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+    $result = $commissionRepo->processSubmitCommission($userId, $title, $description, $file);
 
-            if ($uploadErr !== UPLOAD_ERR_OK) {
-                $error = 'File upload failed. Please try again.';
-            } elseif ($file['size'] > 10 * 1024 * 1024) {
-                $error = 'Attachment must be smaller than 10 MB.';
-            } else {
-                $finfo     = new finfo(FILEINFO_MIME_TYPE);
-                $mime      = $finfo->file($file['tmp_name']);
-
-                $origName  = strtolower($file['name']);
-                $ext       = pathinfo($origName, PATHINFO_EXTENSION);
-                $allowedExts = ['pdf', 'stl'];
-
-                if (!in_array($ext, $allowedExts, true)) {
-                    $error = 'Only PDF and STL files are allowed.';
-                } elseif ($file['size'] === 0) {
-                    $error = 'The uploaded file is empty.';
-                } else {
-                    $uploadDir = __DIR__ . '/../uploads/commissions/';
-                    if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
-                        $error = 'Could not prepare upload folder.';
-                    } else {
-                        $safeFilename = $userId . '_' . time() . '.' . $ext;
-                        $destPath     = $uploadDir . $safeFilename;
-                        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                            $error = 'Failed to save attachment.';
-                        } else {
-                            $attachUrl = 'uploads/commissions/' . $safeFilename;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if ($error === '') {
-        $newId = $commissionRepo->createCommission($userId, $title, $description, $attachUrl);
-        if ($newId !== null) {
-            // Notify admins about new commission
-            $adminIds = $commissionRepo->getAdminIds();
-            foreach ($adminIds as $adminId) {
-                if ($adminId !== $userId) {
-                    create_notification($conn, $adminId, $userId, 'commission_submitted', null, $newId);
-                }
-            }
-            echo json_encode(['success' => true, 'message' => 'Commission request submitted successfully!']);
-            $conn->close();
-            exit;
-        } else {
-            $error = 'Could not submit request. Please try again.';
-        }
-    }
-
-    echo json_encode(['success' => false, 'error' => $error]);
     $conn->close();
+    echo json_encode($result);
     exit;
 }
 

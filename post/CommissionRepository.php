@@ -112,5 +112,98 @@ class CommissionRepository {
         $stmt->close();
         return $commissions;
     }
+
+    public function getCommissionsWithStats(bool $isAdmin, int $userId): array {
+        $commissions = $this->getAllCommissions($isAdmin, $userId);
+        
+        $stats = ['total' => count($commissions), 'pending' => 0, 'active' => 0, 'completed' => 0, 'spent' => 0.0];
+        foreach ($commissions as $c) {
+            $stats['spent'] += (float) ($c['amount'] ?? 0);
+            $s = $c['status'] ?? '';
+            if ($s === 'Pending')   $stats['pending']++;
+            elseif (in_array($s, ['Accepted','Ongoing','Delayed'], true)) $stats['active']++;
+            elseif ($s === 'Completed') $stats['completed']++;
+        }
+        
+        return ['commissions' => $commissions, 'stats' => $stats];
+    }
+
+    public function processSubmitCommission(int $userId, string $title, string $description, ?array $file): array {
+        $title       = mb_substr(trim($title), 0, 255);
+        $description = mb_substr(trim($description), 0, 2000);
+        $attachUrl   = null;
+
+        if ($description === '') {
+            return ['success' => false, 'error' => 'Description is required.'];
+        }
+
+        if (!empty($file['name'])) {
+            $uploadErr = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+
+            if ($uploadErr !== UPLOAD_ERR_OK) {
+                return ['success' => false, 'error' => 'File upload failed. Please try again.'];
+            } elseif ($file['size'] > 10 * 1024 * 1024) {
+                return ['success' => false, 'error' => 'Attachment must be smaller than 10 MB.'];
+            }
+
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $allowedExts = ['pdf', 'stl'];
+
+            if (!in_array($ext, $allowedExts, true)) {
+                return ['success' => false, 'error' => 'Only PDF and STL files are allowed.'];
+            } elseif ($file['size'] === 0) {
+                return ['success' => false, 'error' => 'The uploaded file is empty.'];
+            }
+
+            $uploadDir = __DIR__ . '/../uploads/commissions/';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                return ['success' => false, 'error' => 'Could not prepare upload folder.'];
+            }
+
+            $safeFilename = $userId . '_' . time() . '.' . $ext;
+            $destPath     = $uploadDir . $safeFilename;
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                return ['success' => false, 'error' => 'Failed to save attachment.'];
+            }
+            $attachUrl = 'uploads/commissions/' . $safeFilename;
+        }
+
+        $newId = $this->createCommission($userId, $title, $description, $attachUrl);
+        if ($newId !== null) {
+            $adminIds = $this->getAdminIds();
+            foreach ($adminIds as $adminId) {
+                if ($adminId !== $userId) {
+                    create_notification($this->conn, $adminId, $userId, 'commission_submitted', null, $newId);
+                }
+            }
+            return ['success' => true, 'message' => 'Commission request submitted successfully!'];
+        }
+
+        return ['success' => false, 'error' => 'Could not submit request. Please try again.'];
+    }
+
+    public function processUpdateCommission(int $commissionId, string $status, string $adminNote, float $amount, int $adminId, string $adminUsername, array $allowedStatuses): array {
+        $status    = trim($status);
+        $adminNote = mb_substr(trim($adminNote), 0, 500);
+        $amount    = max(0, round($amount, 2));
+
+        if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
+            return ['success' => false, 'error' => 'Invalid data.'];
+        }
+
+        $existing = $this->getCommissionById($commissionId);
+        $ownerId = $existing ? (int) ($existing['userID'] ?? 0) : 0;
+        $previousStatus = $existing ? (string) ($existing['status'] ?? '') : '';
+
+        if ($this->updateCommission($commissionId, $status, $adminNote, $amount)) {
+            if ($ownerId > 0 && $previousStatus !== $status) {
+                $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
+                create_notification($this->conn, $ownerId, $adminId, $notifType, null, $commissionId);
+            }
+            $this->logAuditAction($adminId, $adminUsername, "Updated commission #{$commissionId} to {$status}", $commissionId);
+            return ['success' => true, 'status' => $status, 'amount' => $amount, 'amount_formatted' => '₱' . number_format($amount, 2)];
+        }
+        return ['success' => false, 'error' => 'Update failed.'];
+    }
 }
 ?>

@@ -50,6 +50,7 @@ Fab-ulous/
 │   ├── migration_v5.sql          # Expands commission statuses; adds password_resets, messages, audit visibility
 │   ├── migration_v6_paymongo.sql # Creates commission_payments table for PayMongo tracking
 │   └── migration_v7_notifications.sql # Expands notifications.type ENUM for commissions, payments, messages
+│   └── migration_v8_profile_fields.sql # Adds bio column to accounts table
 │
 ├── documentation/
 │   └── FABulous_ProjectDocs_v0.2.0.docx
@@ -197,9 +198,9 @@ FABulous is incrementally transitioning from a monolithic PHP application to mic
 - No external services yet; focus on internal refactoring
 - Goal: Extract domain logic from scripts into reusable Repository classes
 - Benefit: Easier to stub out, mock, or replicate logic when building new services
-- Status: In progress
-  - `post/InteractionRepository.php` — Abstraction for likes and comments (planned)
-  - `like.php` / `comment.php` — Refactored to return JSON instead of redirects
+- Status: ✅ Complete
+  - All major domain logic extracted into `*Repository.php` classes.
+  - Controllers are now thin wrappers calling composite `process*` methods.
 
 **Phase 1: Internal APIs (Planned)**
 - Publish Router/Gateway layer (e.g., `api/v1/router.php`)
@@ -224,12 +225,12 @@ FABulous is incrementally transitioning from a monolithic PHP application to mic
 
 | Domain | Scripts | Repository | API Status |
 |---|---|---|---|
-| Social Graph & Interactions | `post/like.php`, `post/comment.php` | `InteractionRepository.php` (planned) | JSON responses planned |
-| Notifications | `post/notifications.php` | `NotificationRepository.php` | Legacy |
-| Direct Messaging | `post/messages_api.php` | `MessageRepository.php` | Legacy |
-| Commissions | `post/commissions.php` | `CommissionRepository.php` | Legacy |
-| Profiles | `profile/profile.php` | — | Legacy |
-| Authentication | `login/login.php`, `admin/admin_login.php` | — | Legacy (critical — migrated last) |
+| Social Graph & Interactions | `post/like.php`, `post/comment.php`, `post/friends.php`, `post/create_post.php`, etc. | `InteractionRepository.php`, `PostRepository.php`, `FriendRepository.php` | Extracted / Thin Controllers |
+| Notifications | `post/notifications.php` | `NotificationRepository.php` | Extracted / Thin Controllers |
+| Direct Messaging | `post/messages_api.php` | `MessageRepository.php` | Extracted / Thin Controllers |
+| Commissions | `post/commissions.php` | `CommissionRepository.php` | Extracted / Thin Controllers |
+| Profiles | `profile/profile_api.php` | `ProfileRepository.php` | Extracted / Thin Controllers |
+| Authentication | `login/login.php`, `admin/admin_login.php` | — | Legacy |
 
 ---
 
@@ -321,6 +322,7 @@ mysql -u root fab_ulous < database/migration_v4.sql
 mysql -u root fab_ulous < database/migration_v5.sql
 mysql -u root fab_ulous < database/migration_v6_paymongo.sql
 mysql -u root fab_ulous < database/migration_v7_notifications.sql
+mysql -u root fab_ulous < database/migration_v8_profile_fields.sql
 ```
 
 ### Migration reference

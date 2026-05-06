@@ -28,20 +28,11 @@ if (!$postOwnerID) {
     $conn->close(); exit;
 }
 
-$liked = $repo->toggleLike($postID, $userID);
-
-if ($liked && $postOwnerID !== $userID) {
-    $repo->addNotification($postOwnerID, $userID, 'like', $postID);
-}
-
-$count = $repo->getLikeCount($postID);
+$result = $repo->processLike($postID, $userID);
 $conn->close();
 
 echo json_encode([
     'status' => 'success',
-    'data' => [
-        'liked' => $liked,
-        'like_count' => $count
-    ]
+    'data' => $result
 ]);
 ?>

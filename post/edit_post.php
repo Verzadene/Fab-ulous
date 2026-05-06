@@ -17,9 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $userId  = (int) $_SESSION['user']['id'];
 $postId  = (int) ($_POST['post_id'] ?? 0);
-$caption = mb_substr(trim($_POST['caption'] ?? ''), 0, 2000);
+$caption = $_POST['caption'] ?? '';
 
-if (!$postId || $caption === '') {
+if (!$postId || trim($caption) === '') {
     echo json_encode(['success' => false, 'error' => 'Missing post data.']);
     exit;
 }
@@ -27,7 +27,7 @@ if (!$postId || $caption === '') {
 $conn = db_connect();
 $repo = new PostRepository($conn);
 
-$ok = $repo->editPost($postId, $userId, $caption);
+$ok = $repo->processEditPost($postId, $userId, $caption);
 $conn->close();
 
 if (!$ok) {

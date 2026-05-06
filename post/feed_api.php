@@ -12,10 +12,9 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 
 $conn = db_connect();
 $userID = (int)$_SESSION['user']['id'];
-$hasFriendships = (bool)$conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
 
 $postRepo = new PostRepository($conn);
-$posts = $postRepo->getFeed($userID, $hasFriendships);
+$posts = $postRepo->getFeed($userID);
 
 $conn->close();
 

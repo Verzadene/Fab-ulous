@@ -15,7 +15,7 @@ class ProfileRepository {
     public function getUserProfile(int $userId): ?array {
         $picSelect = $this->hasProfilePicColumn() ? ', profile_pic' : '';
         $stmt = $this->conn->prepare(
-            "SELECT first_name, last_name, username, email, password, google_id, created_at{$picSelect}
+            "SELECT first_name, last_name, username, email, bio, password, google_id, created_at{$picSelect}
              FROM accounts WHERE id = ?"
         );
         $stmt->bind_param("i", $userId);
@@ -39,10 +39,10 @@ class ProfileRepository {
         return $taken;
     }
 
-    public function updateProfile(int $id, string $first, string $last, string $user, string $email, ?string $hash, ?string $pic, bool $updatePic, bool $updatePass): bool {
-        $sql = "UPDATE accounts SET first_name=?, last_name=?, username=?, email=?";
-        $types = "ssss";
-        $params = [$first, $last, $user, $email];
+    public function updateProfile(int $id, string $first, string $last, string $user, string $email, string $bio, ?string $hash, ?string $pic, bool $updatePic, bool $updatePass): bool {
+        $sql = "UPDATE accounts SET first_name=?, last_name=?, username=?, email=?, bio=?";
+        $types = "sssss";
+        $params = [$first, $last, $user, $email, $bio];
 
         if ($updatePass) { $sql .= ", password=?"; $types .= "s"; $params[] = $hash; }
         if ($updatePic)  { $sql .= ", profile_pic=?"; $types .= "s"; $params[] = $pic; }

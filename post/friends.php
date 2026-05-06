@@ -26,25 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
 
     $targetID = (int)($_GET['user_id'] ?? 0);
-    if (!$targetID || $targetID === $myID) {
-        echo json_encode(['success' => false, 'error' => 'Invalid user']);
-        $conn->close();
-        exit;
-    }
-
-    $row = $repo->getFriendshipStatus($myID, $targetID);
+    $result = $repo->processGetStatus($myID, $targetID);
     $conn->close();
-
-    if (!$row) {
-        echo json_encode(['success' => true, 'status' => 'none']);
-    } else {
-        echo json_encode([
-            'success'       => true,
-            'status'        => $row['status'],
-            'friendshipID'  => $row['friendshipID'],
-            'i_requested'   => ((int)$row['requesterID'] === $myID),
-        ]);
-    }
+    echo json_encode($result);
     exit;
 }
 
@@ -55,63 +39,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Send a friend request
     if ($action === 'send') {
         $receiverID = (int)($_POST['receiver_id'] ?? 0);
-        if (!$receiverID || $receiverID === $myID) {
-            echo json_encode(['success' => false, 'error' => 'Invalid receiver']);
-            $conn->close();
-            exit;
-        }
-
-        if ($repo->getFriendshipStatus($myID, $receiverID)) {
-            echo json_encode(['success' => false, 'error' => 'Request already exists']);
-            $conn->close();
-            exit;
-        }
-
-        $friendshipID = $repo->createFriendRequest($myID, $receiverID);
+        $result = $repo->processSendRequest($myID, $receiverID);
         $conn->close();
-
-        if ($friendshipID) {
-            echo json_encode(['success' => true, 'friendshipID' => $friendshipID]);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Insert failed']);
-        }
-
+        echo json_encode($result);
         exit;
     }
 
     // Accept a friend request
     if ($action === 'accept') {
         $friendshipID = (int)($_POST['friendship_id'] ?? 0);
-        if (!$friendshipID) {
-            echo json_encode(['success' => false, 'error' => 'Invalid ID']);
-            $conn->close();
-            exit;
-        }
-
-        $requesterID = $repo->getPendingRequest($friendshipID, $myID);
-        if (!$requesterID) {
-            echo json_encode(['success' => false, 'error' => 'Request not found']);
-            $conn->close(); exit;
-        }
-
-        $ok = $repo->acceptFriendRequest($friendshipID, $myID, $requesterID);
+        $result = $repo->processAcceptRequest($myID, $friendshipID);
         $conn->close();
-        echo json_encode(['success' => $ok]);
+        echo json_encode($result);
         exit;
     }
 
     // Reject / cancel / remove a friendship (deletes the record so either side can resend)
     if ($action === 'reject' || $action === 'cancel' || $action === 'remove') {
         $friendshipID = (int)($_POST['friendship_id'] ?? 0);
-        if (!$friendshipID) {
-            echo json_encode(['success' => false, 'error' => 'Invalid ID']);
-            $conn->close();
-            exit;
-        }
-
-        $repo->deleteFriendship($friendshipID, $myID);
+        $result = $repo->processRemoveFriendship($myID, $friendshipID);
         $conn->close();
-        echo json_encode(['success' => true]);
+        echo json_encode($result);
         exit;
     }
 }

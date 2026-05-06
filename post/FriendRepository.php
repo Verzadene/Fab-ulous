@@ -13,6 +13,7 @@ class FriendRepository {
                    CONCAT(a.first_name, ' ', a.last_name) AS name,
                    a.username,
                    a.profile_pic,
+                   a.bio,
                    COALESCE((
                        SELECT status FROM friendships
                        WHERE (requesterID = ? AND receiverID = a.id)
@@ -152,6 +153,48 @@ class FriendRepository {
         }
 
         return true;
+    }
+
+    public function processGetStatus(int $myID, int $targetID): array {
+        if (!$targetID || $targetID === $myID) {
+            return ['success' => false, 'error' => 'Invalid user'];
+        }
+        $row = $this->getFriendshipStatus($myID, $targetID);
+        if (!$row) {
+            return ['success' => true, 'status' => 'none'];
+        }
+        return [
+            'success'       => true,
+            'status'        => $row['status'],
+            'friendshipID'  => $row['friendshipID'],
+            'i_requested'   => ((int)$row['requesterID'] === $myID),
+        ];
+    }
+
+    public function processSendRequest(int $myID, int $receiverID): array {
+        if (!$receiverID || $receiverID === $myID) {
+            return ['success' => false, 'error' => 'Invalid receiver'];
+        }
+        if ($this->getFriendshipStatus($myID, $receiverID)) {
+            return ['success' => false, 'error' => 'Request already exists'];
+        }
+        $friendshipID = $this->createFriendRequest($myID, $receiverID);
+        return $friendshipID 
+            ? ['success' => true, 'friendshipID' => $friendshipID]
+            : ['success' => false, 'error' => 'Insert failed'];
+    }
+
+    public function processAcceptRequest(int $myID, int $friendshipID): array {
+        if (!$friendshipID) return ['success' => false, 'error' => 'Invalid ID'];
+        $requesterID = $this->getPendingRequest($friendshipID, $myID);
+        if (!$requesterID) return ['success' => false, 'error' => 'Request not found'];
+        return ['success' => $this->acceptFriendRequest($friendshipID, $myID, $requesterID)];
+    }
+
+    public function processRemoveFriendship(int $myID, int $friendshipID): array {
+        if (!$friendshipID) return ['success' => false, 'error' => 'Invalid ID'];
+        $this->deleteFriendship($friendshipID, $myID);
+        return ['success' => true];
     }
 }
 ?>

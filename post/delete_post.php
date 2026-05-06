@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $userId = (int) $_SESSION['user']['id'];
 $postId = (int) ($_POST['post_id'] ?? 0);
+$actorUsername = $_SESSION['user']['username'];
 
 if (!$postId) {
     echo json_encode(['success' => false, 'error' => 'Missing post ID.']);
@@ -26,13 +27,7 @@ if (!$postId) {
 $conn = db_connect();
 $repo = new PostRepository($conn);
 
-$ok = $repo->deletePost($postId, $userId);
-
-if ($ok) {
-    $actorUsername = $_SESSION['user']['username'];
-    $action = "User {$actorUsername} deleted their post #{$postId}";
-    $repo->logAuditAction($userId, $actorUsername, $action, $postId);
-}
+$ok = $repo->processDeletePost($postId, $userId, $actorUsername);
 
 $conn->close();
 

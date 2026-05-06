@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     last_name   VARCHAR(100) NOT NULL,
     username    VARCHAR(50)  UNIQUE NOT NULL,
     email       VARCHAR(150) UNIQUE NOT NULL,
+    bio         VARCHAR(255) DEFAULT '',
     password    VARCHAR(255),
     google_id   VARCHAR(100),
     profile_pic VARCHAR(100) DEFAULT NULL,

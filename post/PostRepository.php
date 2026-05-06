@@ -12,7 +12,9 @@ class PostRepository {
      * If friendships are enabled, it fetches own posts + friends' posts.
      * Otherwise, it just fetches own posts.
      */
-    public function getFeed(int $userID, bool $hasFriendships, int $limit = 20): array {
+    public function getFeed(int $userID, int $limit = 20): array {
+        $hasFriendships = (bool) $this->conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
+
         if ($hasFriendships) {
             $stmt = $this->conn->prepare("
                 SELECT p.postID, p.caption, p.image_url, p.created_at,
@@ -56,12 +58,45 @@ class PostRepository {
         return $posts;
     }
 
+    public function processCreatePost(int $userID, string $caption, ?array $imageFile): bool {
+        $imageURL = null;
+
+        if ($imageFile && $imageFile['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = __DIR__ . '/../uploads/posts/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+
+            $ext     = strtolower(pathinfo($imageFile['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg','jpeg','png','gif','webp'];
+
+            if (in_array($ext, $allowed) && $imageFile['size'] <= 5 * 1024 * 1024) {
+                $filename = uniqid('post_', true) . '.' . $ext;
+                if (move_uploaded_file($imageFile['tmp_name'], $uploadDir . $filename)) {
+                    $imageURL = '../uploads/posts/' . $filename;
+                }
+            }
+        }
+
+        if (empty($caption) && !$imageURL) {
+            return false;
+        }
+
+        return $this->createPost($userID, $caption, $imageURL);
+    }
+
     public function createPost(int $userID, string $caption, ?string $imageURL): bool {
         $stmt = $this->conn->prepare("INSERT INTO posts (userID, caption, image_url) VALUES (?, ?, ?)");
         $stmt->bind_param("iss", $userID, $caption, $imageURL);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;
+    }
+
+    public function processEditPost(int $postID, int $userID, string $caption): bool {
+        $caption = mb_substr(trim($caption), 0, 2000);
+        if ($caption === '') {
+            return false;
+        }
+        return $this->editPost($postID, $userID, $caption);
     }
 
     public function editPost(int $postID, int $userID, string $caption): bool {
@@ -71,6 +106,15 @@ class PostRepository {
         $affected = $stmt->affected_rows;
         $stmt->close();
         return $ok && $affected > 0;
+    }
+
+    public function processDeletePost(int $postID, int $userID, string $actorUsername): bool {
+        $ok = $this->deletePost($postID, $userID);
+        if ($ok) {
+            $action = "User {$actorUsername} deleted their post #{$postID}";
+            $this->logAuditAction($userID, $actorUsername, $action, $postID);
+        }
+        return $ok;
     }
 
     public function deletePost(int $postID, int $userID): bool {

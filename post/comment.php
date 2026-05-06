@@ -26,6 +26,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get') {
 
 // ── POST: add comment ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? 'add';
+
+    if ($action === 'delete') {
+        $commentID = (int)($_POST['comment_id'] ?? 0);
+        if (!$commentID) {
+            echo json_encode(['status' => 'error', 'message' => 'Missing data']);
+            $conn->close(); exit;
+        }
+        $ok = $repo->deleteComment($commentID, $userID);
+        $conn->close();
+        echo json_encode(['status' => $ok ? 'success' : 'error']);
+        exit;
+    }
+
+    if ($action === 'edit') {
+        $commentID = (int)($_POST['comment_id'] ?? 0);
+        $content = trim($_POST['content'] ?? '');
+        if (!$commentID || empty($content)) {
+            echo json_encode(['status' => 'error', 'message' => 'Missing data']);
+            $conn->close(); exit;
+        }
+        $content = mb_substr($content, 0, 500);
+        $ok = $repo->editComment($commentID, $userID, $content);
+        $conn->close();
+        echo json_encode(['status' => $ok ? 'success' : 'error']);
+        exit;
+    }
+
     $postID  = (int)($_POST['post_id'] ?? 0);
     $content = trim($_POST['content'] ?? '');
 
@@ -37,13 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $content = mb_substr($content, 0, 500);
 
-    $postOwnerID = $repo->getPostOwner($postID);
-
-    $ok = $repo->addComment($postID, $userID, $content);
-
-    if ($ok && $postOwnerID && $postOwnerID !== $userID) {
-        $repo->addNotification($postOwnerID, $userID, 'comment', $postID);
-    }
+    $ok = $repo->processAddComment($postID, $userID, $content);
 
     $conn->close();
     if ($ok) {

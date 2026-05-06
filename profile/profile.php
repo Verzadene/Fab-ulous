@@ -94,6 +94,11 @@ $myAvatarUrl = get_current_user_avatar();
                 <label class="field-label" for="email">Email</label>
                 <input type="email" id="email" name="email" class="field-input" maxlength="150" required/>
               </div>
+
+            <div class="settings-field">
+              <label class="field-label" for="bio">Bio</label>
+              <textarea id="bio" name="bio" class="field-input" rows="3" maxlength="255" placeholder="Tell us a bit about yourself..."></textarea>
+            </div>
             </div>
 
             <!-- Change Password -->
@@ -232,6 +237,7 @@ $myAvatarUrl = get_current_user_avatar();
           document.getElementById('last_name').value = d.last_name;
           document.getElementById('username').value = d.username;
           document.getElementById('email').value = d.email;
+          document.getElementById('bio').value = d.bio;
           document.getElementById('memberSinceText').textContent = d.member_since;
 
           document.getElementById('drawerName').textContent = d.first_name + ' ' + d.last_name;

@@ -16,7 +16,7 @@
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
 - Main database setup: `database/setup.sql`
-- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`, `database/migration_v7_notifications.sql`
+- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`, `database/migration_v7_notifications.sql`, `database/migration_v8_profile_fields.sql`
 - Password reset depends on the `password_resets` table from `database/migration_v5.sql`
 - PayMongo commission payments depend on the `commission_payments` table from `database/migration_v6_paymongo.sql` and placeholder keys in `config.php` or `config.local.php`
 - Commission, payment, and message notifications depend on the expanded `notifications.type` enum from `database/migration_v7_notifications.sql`.
@@ -37,6 +37,7 @@
 9. Avoid breaking XAMPP-friendly paths. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...` unless environment config is being updated intentionally.
 10. If a feature depends on a schema migration or config change, surface that clearly in the UI or docs instead of failing silently.
 11. Password reset emails should go through `send_password_reset_email()` in `config.php` so send failures can be surfaced consistently.
+12. **Repository Pattern:** Phase 0 of the architecture migration is complete. Endpoint scripts (`.php`) should act as thin HTTP controllers. Place all database queries and multi-step business logic (e.g., executing an action *and* firing a notification) into composite methods inside the corresponding `*Repository.php` classes.
 
 ## UI Patterns
 

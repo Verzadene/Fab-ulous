@@ -113,6 +113,9 @@ $conn->close();
                       <span class="msg-friend-tag">&#10003; Friend</span>
                     <?php endif; ?>
                   </small>
+                  <?php if (!empty($contact['bio'])): ?>
+                    <div style="font-size:0.8em; opacity:0.7; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"><?php echo htmlspecialchars($contact['bio']); ?></div>
+                  <?php endif; ?>
                 </span>
               </a>
             <?php endforeach; ?>
@@ -150,6 +153,9 @@ $conn->close();
               <div>
                 <h3><?php echo htmlspecialchars($selectedContact['name']); ?></h3>
                 <p>@<?php echo htmlspecialchars($selectedContact['username']); ?></p>
+                <?php if (!empty($selectedContact['bio'])): ?>
+                  <p style="font-size:0.85em; opacity:0.8; margin-top:2px; margin-bottom:0; line-height:1.3; max-width:350px;"><?php echo htmlspecialchars($selectedContact['bio']); ?></p>
+                <?php endif; ?>
               </div>
             </div>
             <span class="thread-badge">

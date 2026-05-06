@@ -240,6 +240,7 @@ function normalizeFriendRecord(record) {
     id: Number(record.id),
     name: String(record.name ?? '').trim() || String(record.username ?? ''),
     username: String(record.username ?? ''),
+    bio: String(record.bio ?? ''),
     profile_pic: record.profile_pic ? String(record.profile_pic) : null,
     friend_status: String(record.friend_status ?? 'none'),
     friendship_id: record.friendship_id ? Number(record.friendship_id) : 0,
@@ -348,6 +349,7 @@ function renderFeed(posts) {
 
     const captionHtml = post.caption ? `<p class="post-caption">${esc(post.caption).replace(/\\n/g, '<br>')}</p>` : '';
     const imgHtml = post.image_url ? `<img src="${esc(post.image_url)}" class="post-image" alt="Post image"/>` : '';
+    const bioHtml = post.author_bio ? `<span class="post-bio" style="display:block; font-size:0.85em; opacity:0.8; margin-bottom:2px;">${esc(post.author_bio)}</span>` : '';
 
     return `
       <div class="post-card" id="post-${post.postID}">
@@ -355,6 +357,7 @@ function renderFeed(posts) {
           <div class="post-avatar">${avatar}</div>
           <div class="post-meta">
             <span class="post-author">${esc(post.author)}</span>
+            ${bioHtml}
             <span class="post-time">${dateStr}</span>
           </div>
           ${ownActions}
@@ -391,6 +394,8 @@ function buildFriendRow(record, actionMarkup) {
     ? `<img src="../uploads/profile_pics/${encodeURIComponent(record.profile_pic)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" alt=""/>`
     : initial;
 
+  const bioHtml = record.bio ? `<div class="friend-bio" style="font-size:0.8em; opacity:0.7; margin-top:2px; line-height:1.2; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(record.bio)}</div>` : '';
+
   return `
     <div class="friend-row">
       <div class="friend-person">
@@ -398,6 +403,7 @@ function buildFriendRow(record, actionMarkup) {
         <div class="friend-copy">
           <div class="friend-name">${safeName}</div>
           <div class="friend-handle">@${safeUsername}</div>
+          ${bioHtml}
         </div>
       </div>
       <div class="friend-row-actions">${actionMarkup}</div>
@@ -502,7 +508,19 @@ async function loadComments(postID) {
       data.data.comments.forEach(comment => {
         const item = document.createElement('div');
         item.className = 'comment-item';
-        item.innerHTML = `<span class="comment-author">${esc(comment.username)}</span> ${esc(comment.content)}`;
+          
+          const isMine = Number(comment.userID) === myUserID;
+          let actionsHtml = '';
+          if (isMine) {
+            const safeContent = encodeURIComponent(comment.content || '');
+            actionsHtml = `
+              <div class="comment-actions" style="font-size:0.8em; margin-top:2px;">
+                <button type="button" onclick="editComment(${comment.commentID}, ${postID}, decodeURIComponent('${safeContent}'))" style="background:none;border:none;color:#888;cursor:pointer;padding:0;margin-right:8px;text-decoration:underline;">Edit</button>
+                <button type="button" onclick="deleteComment(${comment.commentID}, ${postID})" style="background:none;border:none;color:#888;cursor:pointer;padding:0;text-decoration:underline;">Delete</button>
+              </div>
+            `;
+          }
+          item.innerHTML = `<div><span class="comment-author">${esc(comment.username)}</span> ${esc(comment.content)}</div>${actionsHtml}`;
         list.appendChild(item);
       });
     } else {
@@ -523,7 +541,7 @@ async function submitComment(event, postID) {
     const response = await fetch('comment.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'post_id=' + postID + '&content=' + encodeURIComponent(content)
+        body: 'action=add&post_id=' + postID + '&content=' + encodeURIComponent(content)
     });
     const data = await response.json();
     if (data.status === 'success') {
@@ -532,6 +550,44 @@ async function submitComment(event, postID) {
     }
   } catch (error) {
     console.error('Comment error:', error);
+  }
+}
+
+async function editComment(commentID, postID, oldContent) {
+  const newContent = prompt('Edit your comment:', oldContent);
+  if (newContent === null) return;
+  const content = newContent.trim();
+  if (!content) return;
+
+  try {
+    const response = await fetch('comment.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'action=edit&comment_id=' + commentID + '&content=' + encodeURIComponent(content)
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      loadComments(postID);
+    }
+  } catch (error) {
+    console.error('Edit comment error:', error);
+  }
+}
+
+async function deleteComment(commentID, postID) {
+  if (!confirm('Delete this comment?')) return;
+  try {
+    const response = await fetch('comment.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'action=delete&comment_id=' + commentID
+    });
+    const data = await response.json();
+    if (data.status === 'success') {
+      loadComments(postID);
+    }
+  } catch (error) {
+    console.error('Delete comment error:', error);
   }
 }
 

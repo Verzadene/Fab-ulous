@@ -31,29 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // Verify target account exists and is not banned
-    if (!$msgRepo->checkUserExists($friendId)) {
-        $conn->close();
-        echo json_encode(['success' => false, 'error' => 'That account does not exist.']);
-        exit;
-    }
-
-    $messageColumn = $schema['message_column'];
-    $timeColumn = $schema['time_column'];
-    
-    $rows = $msgRepo->getConversation($userId, $friendId, $messageColumn, $timeColumn);
+    $result = $msgRepo->processGetConversation($userId, $friendId, $schema);
     $conn->close();
-
-    $messages = array_map(static function (array $row) use ($userId): array {
-        return [
-            'message_text' => $row['message_text'],
-            'sender_name' => $row['sender_name'],
-            'sent_at' => date('M d, Y H:i', strtotime($row['sent_at'])),
-            'is_mine' => (int) $row['senderID'] === $userId,
-        ];
-    }, $rows);
-
-    echo json_encode(['success' => true, 'messages' => $messages]);
+    
+    echo json_encode($result);
     exit;
 }
 
@@ -62,31 +43,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $friendId = (int) ($_POST['friend_id'] ?? 0);
     $message = trim($_POST['message_text'] ?? '');
 
-    if ($action !== 'send' || !$friendId || $message === '') {
+    if ($action !== 'send') {
         $conn->close();
-        echo json_encode(['success' => false, 'error' => 'Message data is incomplete.']);
+        echo json_encode(['success' => false, 'error' => 'Invalid request.']);
         exit;
     }
 
-    // Verify target account exists and is not banned
-    if (!$msgRepo->checkUserExists($friendId)) {
-        $conn->close();
-        echo json_encode(['success' => false, 'error' => 'That account does not exist.']);
-        exit;
-    }
-
-    $message = mb_substr($message, 0, 1000);
-    $messageColumn = $schema['message_column'];
-    
-    $success = $msgRepo->sendMessage($userId, $friendId, $message, $messageColumn);
-
-    if ($success) {
-        create_notification($conn, $friendId, $userId, 'message', null, $userId);
-    }
-
+    $result = $msgRepo->processSendMessage($userId, $friendId, $message, $schema);
     $conn->close();
-
-    echo json_encode(['success' => $success]);
+    
+    echo json_encode($result);
     exit;
 }
 

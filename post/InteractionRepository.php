@@ -80,7 +80,7 @@ class InteractionRepository {
 
     public function getComments(int $postID, int $limit = 50): array {
         $cstmt = $this->conn->prepare(
-            "SELECT c.content, c.created_at, a.username
+            "SELECT c.commentID, c.userID, c.content, c.created_at, a.username
              FROM comments c JOIN accounts a ON c.userID = a.id
              WHERE c.postID = ?
              ORDER BY c.created_at ASC
@@ -105,6 +105,55 @@ class InteractionRepository {
         $stmt->bind_param("iis", $postID, $userID, $content);
         $ok = $stmt->execute();
         $stmt->close();
+        return $ok;
+    }
+
+    public function getCommentOwner(int $commentID): int {
+        $stmt = $this->conn->prepare("SELECT userID FROM comments WHERE commentID = ?");
+        $stmt->bind_param("i", $commentID);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        return $row ? (int)$row['userID'] : 0;
+    }
+
+    public function editComment(int $commentID, int $userID, string $content): bool {
+        $stmt = $this->conn->prepare("UPDATE comments SET content = ? WHERE commentID = ? AND userID = ?");
+        $stmt->bind_param("sii", $content, $commentID, $userID);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+
+    public function deleteComment(int $commentID, int $userID): bool {
+        $stmt = $this->conn->prepare("DELETE FROM comments WHERE commentID = ? AND userID = ?");
+        $stmt->bind_param("ii", $commentID, $userID);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+
+    public function processLike(int $postID, int $userID): array {
+        $liked = $this->toggleLike($postID, $userID);
+        $postOwnerID = $this->getPostOwner($postID);
+
+        if ($liked && $postOwnerID && $postOwnerID !== $userID) {
+            $this->addNotification($postOwnerID, $userID, 'like', $postID);
+        }
+
+        $count = $this->getLikeCount($postID);
+        return ['liked' => $liked, 'like_count' => $count];
+    }
+
+    public function processAddComment(int $postID, int $userID, string $content): bool {
+        $ok = $this->addComment($postID, $userID, $content);
+        $postOwnerID = $this->getPostOwner($postID);
+
+        if ($ok && $postOwnerID && $postOwnerID !== $userID) {
+            $this->addNotification($postOwnerID, $userID, 'comment', $postID);
+        }
+
         return $ok;
     }
 }

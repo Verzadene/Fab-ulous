@@ -18,6 +18,7 @@ class MessageRepository {
                         CONCAT(a.first_name, ' ', a.last_name) AS name,
                         a.username,
                         a.profile_pic,
+                        a.bio,
                         COALESCE((
                             SELECT status FROM friendships
                             WHERE (requesterID = ? AND receiverID = a.id)
@@ -42,6 +43,7 @@ class MessageRepository {
                         CONCAT(a.first_name, ' ', a.last_name) AS name,
                         a.username,
                         a.profile_pic,
+                        a.bio,
                         'none' AS friend_status
                  FROM accounts a
                  WHERE a.id != ? AND a.banned = 0
@@ -116,6 +118,47 @@ class MessageRepository {
         $success = $stmt->execute();
         $stmt->close();
         return $success;
+    }
+
+    public function processGetConversation(int $userId, int $friendId, array $schema): array {
+        if (!$this->checkUserExists($friendId)) {
+            return ['success' => false, 'error' => 'That account does not exist.'];
+        }
+
+        $messageColumn = $schema['message_column'];
+        $timeColumn = $schema['time_column'];
+        
+        $rows = $this->getConversation($userId, $friendId, $messageColumn, $timeColumn);
+
+        $messages = array_map(static function (array $row) use ($userId): array {
+            return [
+                'message_text' => $row['message_text'],
+                'sender_name' => $row['sender_name'],
+                'sent_at' => date('M d, Y H:i', strtotime($row['sent_at'])),
+                'is_mine' => (int) $row['senderID'] === $userId,
+            ];
+        }, $rows);
+
+        return ['success' => true, 'messages' => $messages];
+    }
+
+    public function processSendMessage(int $userId, int $friendId, string $message, array $schema): array {
+        if (!$friendId || $message === '') {
+            return ['success' => false, 'error' => 'Message data is incomplete.'];
+        }
+
+        if (!$this->checkUserExists($friendId)) {
+            return ['success' => false, 'error' => 'That account does not exist.'];
+        }
+
+        $message = mb_substr($message, 0, 1000);
+        $success = $this->sendMessage($userId, $friendId, $message, $schema['message_column']);
+
+        if ($success) {
+            create_notification($this->conn, $friendId, $userId, 'message', null, $userId);
+        }
+
+        return ['success' => $success];
     }
 }
 ?>

@@ -36,6 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             'last_name' => $user['last_name'],
             'username' => $user['username'],
             'email' => $user['email'],
+            'bio' => $user['bio'] ?? '',
             'has_password' => !empty($user['password']),
             'has_google' => !empty($user['google_id']),
             'member_since' => date('M d, Y', strtotime($user['created_at'])),
@@ -54,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastName    = trim($_POST['last_name'] ?? '');
     $newUsername = trim($_POST['username'] ?? '');
     $newEmail    = trim($_POST['email'] ?? '');
+    $bio         = trim($_POST['bio'] ?? '');
     $newPass     = $_POST['new_password'] ?? '';
     $confirmPass = $_POST['confirm_password'] ?? '';
     $currentPass = $_POST['current_password'] ?? '';
@@ -110,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Invalid email address.';
         } elseif (strlen($newUsername) < 3 || strlen($newUsername) > 50) {
             $errors[] = 'Username must be 3–50 characters.';
+        } elseif (strlen($bio) > 255) {
+            $errors[] = 'Bio must be 255 characters or less.';
         } elseif ($repo->isUsernameOrEmailTaken($newUsername, $newEmail, $userID)) {
             $errors[] = 'That username or email is already used by another account.';
         }
@@ -135,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $ok = $repo->updateProfile($userID, $firstName, $lastName, $newUsername, $newEmail, $hashedPass, $newPicFilename, $picUpdated, $updatePass);
+        $ok = $repo->updateProfile($userID, $firstName, $lastName, $newUsername, $newEmail, $bio, $hashedPass, $newPicFilename, $picUpdated, $updatePass);
         if ($ok) {
             $_SESSION['user']['name'] = $firstName . ' ' . $lastName;
             $_SESSION['user']['username'] = $newUsername;
