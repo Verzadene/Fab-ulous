@@ -561,3 +561,20 @@ function send_registration_verification_email(string $email, string $displayName
         . "FABulous Team";
     return send_smtp_mail($email, $displayName, $subject, $message);
 }
+
+function send_account_deletion_email(string $email, string $displayName, string $reason): bool
+{
+    $subject = 'Your FABulous Account Has Been Deleted';
+    $message = "Hello {$displayName},\n\n"
+        . "We are writing to inform you that your FABulous account has been permanently deleted.\n\n"
+        . "Reason for deletion:\n"
+        . "─────────────────────────────────────\n"
+        . $reason . "\n"
+        . "─────────────────────────────────────\n\n"
+        . "All associated data including posts, messages, and profile information have been removed from our platform.\n\n"
+        . "If you believe this was done in error or have questions, please contact our support team.\n\n"
+        . "Thank you for your time with FABulous.\n\n"
+        . "FABulous Moderation Team";
+
+    return send_smtp_mail($email, $displayName, $subject, $message);
+}

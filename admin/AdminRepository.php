@@ -197,5 +197,79 @@ class AdminRepository {
         }
         return "Commission #$targetID updated.";
     }
+
+    public function processDeleteUser(int $targetID, int $adminID, string $adminUsername, string $deletionReason, bool $isSuperAdmin): string
+    {
+        // Prevent self-deletion and protect super_admin accounts
+        if ($targetID === $adminID) {
+            return "Cannot delete your own account.";
+        }
+
+        // Fetch user details before deletion
+        $sel = $this->conn->prepare("SELECT username, email, first_name, last_name, role FROM accounts WHERE id = ?");
+        if (!$sel) {
+            return "Failed to retrieve user details.";
+        }
+        
+        $sel->bind_param("i", $targetID);
+        $sel->execute();
+        $userRow = $sel->get_result()->fetch_assoc();
+        $sel->close();
+
+        if (!$userRow) {
+            return "User not found.";
+        }
+
+        $userRole = $userRow['role'] ?? 'user';
+        $userEmail = $userRow['email'] ?? '';
+        $userDisplayName = trim(($userRow['first_name'] ?? '') . ' ' . ($userRow['last_name'] ?? ''));
+        if (empty($userDisplayName)) {
+            $userDisplayName = $userRow['username'] ?? 'User';
+        }
+
+        // Permission check: prevent deletion of super_admin or admin accounts unless done by super_admin
+        if ($userRole === 'super_admin') {
+            return "Cannot delete super admin accounts.";
+        }
+
+        if ($userRole === 'admin' && !$isSuperAdmin) {
+            return "Only super admins can delete admin accounts.";
+        }
+
+        // Send deletion email before deletion
+        $emailSent = false;
+        if (!empty($userEmail)) {
+            $emailSent = send_account_deletion_email($userEmail, $userDisplayName, $deletionReason);
+        }
+
+        // Delete user account
+        $del = $this->conn->prepare("DELETE FROM accounts WHERE id = ?");
+        if (!$del) {
+            return "Failed to delete account.";
+        }
+
+        $del->bind_param("i", $targetID);
+        $deleted = $del->execute();
+        $del->close();
+
+        if (!$deleted) {
+            return "Failed to delete account.";
+        }
+
+        // Log the admin action
+        $logAction = "Deleted user account: " . ($userRow['username'] ?? 'Unknown');
+        if (!$emailSent && !empty($userEmail)) {
+            $logAction .= " (deletion email failed to send to {$userEmail})";
+        }
+        $vis = $userRole === 'admin' ? 'super_admin' : 'admin';
+        $this->logAdminAction($adminID, $adminUsername, $logAction, 'user', $targetID, $vis);
+
+        $statusMsg = "User account deleted.";
+        if (!$emailSent && !empty($userEmail)) {
+            $statusMsg .= " Warning: Deletion notification email failed to send.";
+        }
+        
+        return $statusMsg;
+    }
 }
 ?>

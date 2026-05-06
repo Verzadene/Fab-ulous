@@ -38,6 +38,25 @@
 10. If a feature depends on a schema migration or config change, surface that clearly in the UI or docs instead of failing silently.
 11. Password reset emails should go through `send_password_reset_email()` in `config.php` so send failures can be surfaced consistently.
 12. **Repository Pattern:** Phase 0 of the architecture migration is complete. Endpoint scripts (`.php`) should act as thin HTTP controllers. Place all database queries and multi-step business logic (e.g., executing an action *and* firing a notification) into composite methods inside the corresponding `*Repository.php` classes.
+13. **Account Deletion:** Super admins can delete any user account (except other super admins). Regular admins can delete regular users only. Deletion requires a reason/description which is sent to the user via email before account removal. The deletion action is logged in the audit trail. Email send failures do not prevent deletion but are logged in the audit message.
+
+## Admin Features
+
+### User Account Deletion
+- **Location:** Admin Dashboard > User Management tab
+- **UI:** Delete button appears in the Actions column for eligible users (only super admins can delete, or admins deleting regular users)
+- **Modal:** Clicking Delete opens a Bootstrap modal with:
+  - Warning banner with icon and user details (username, email)
+  - Textarea for admin to enter deletion reason (1000 char limit, required)
+  - Character counter
+  - Cancel and "Delete Account Permanently" buttons
+- **Implementation:** 
+  - Modal logic in `admin.php` with `openDeleteUserModal()` and `confirmDeleteUser()` JS functions
+  - `processDeleteUser()` method in `AdminRepository.php` handles email, deletion, and audit logging
+  - `send_account_deletion_email()` in `config.php` formats the dismissal email with reason
+  - Email includes deletion reason formatted clearly so user knows why account was removed
+- **Safeguards:** Cannot delete self, cannot delete super_admin accounts, admin role protection via role checks
+- **Email:** Sends via SMTP if configured; email failure is noted in audit log but does not block deletion
 
 ## UI Patterns
 

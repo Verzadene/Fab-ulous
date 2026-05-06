@@ -359,6 +359,158 @@ html, body {
 .btn-promote { background: rgba(52,152,219,0.18);   color: #5dade2; }
 .btn-demote  { background: rgba(155,89,182,0.18);   color: #bb8fce; }
 .btn-save    { background: rgba(119,204,129,0.20);  color: var(--green-active); }
+.btn-delete  { background: rgba(231,76,60,0.20);   color: #e74c3c; font-weight: 600; }
+
+/* ── Delete User Modal ── */
+.delete-modal-content {
+  background: var(--card-bg);
+  border: 1px solid rgba(119,204,129,0.2);
+  border-radius: var(--radius);
+}
+
+.delete-modal-header {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 24px;
+  background: rgba(0,0,0,0.2);
+}
+
+.delete-modal-header .modal-title {
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  color: #e74c3c;
+}
+
+.delete-modal-body {
+  padding: 24px;
+}
+
+.delete-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(231,76,60,0.12);
+  border: 1px solid rgba(231,76,60,0.3);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.delete-warning svg {
+  color: #e74c3c;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.delete-warning h6 {
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 700;
+  color: #e74c3c;
+  margin: 0;
+}
+
+.delete-user-info {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  margin: 0;
+  word-break: break-all;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-white);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.form-text {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: rgba(255,255,255,0.55);
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.deletion-reason-textarea {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-white);
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.deletion-reason-textarea:focus {
+  border-color: var(--green-accent);
+  box-shadow: 0 0 0 3px rgba(71,124,90,0.1);
+}
+
+.deletion-reason-textarea::placeholder {
+  color: rgba(255,255,255,0.35);
+}
+
+.reason-char-count {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  text-align: right;
+  margin-top: 6px;
+}
+
+.delete-modal-footer {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 16px 24px;
+  background: rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.delete-modal-footer .btn {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-modal-footer .btn-secondary {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-white);
+}
+
+.delete-modal-footer .btn-secondary:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.delete-modal-footer .btn-danger {
+  background: #e74c3c;
+  color: var(--text-white);
+}
+
+.delete-modal-footer .btn-danger:hover {
+  background: #c0392b;
+}
 
 /* ── Commission Form (inline in table) ── */
 .commission-form {

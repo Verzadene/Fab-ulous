@@ -33,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $actionMsg = $adminRepo->processBanUser($targetID, $adminID, $adminUsername, $isSuperAdmin);
     } elseif ($action === 'unban_user' && $targetID) {
         $actionMsg = $adminRepo->processUnbanUser($targetID, $adminID, $adminUsername);
+    } elseif ($action === 'delete_user' && $targetID) {
+        $deletionReason = $_POST['deletion_reason'] ?? '';
+        $actionMsg = $adminRepo->processDeleteUser($targetID, $adminID, $adminUsername, $deletionReason, $isSuperAdmin);
     } elseif ($action === 'delete_post' && $targetID) {
         $actionMsg = $adminRepo->processDeletePost($targetID, $adminID, $adminUsername);
     } elseif ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
@@ -215,6 +218,7 @@ $conn->close();
                 $canBan      = !$isSelf && !$u['banned'] && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
                 $canPromote  = $isSuperAdmin && $uRole === 'user';
                 $canDemote   = $isSuperAdmin && $isAdminTgt && !$isSelf;
+                $canDelete   = !$isSelf && !$isSuperTgt && ($isSuperAdmin || $uRole === 'user');
                 
                 $searchString = htmlspecialchars(strtolower($u['username'] . ' ' . $u['first_name'] . ' ' . $u['last_name'] . ' ' . $u['email']));
                 $dateString = date('Y-m-d', strtotime($u['created_at']));
@@ -243,6 +247,13 @@ $conn->close();
                       </button>
                     </form>
                   <?php endif; ?>
+                  <?php if ($canDelete): ?>
+                    <button type="button" 
+                            class="action-btn btn-delete"
+                            onclick="openDeleteUserModal(<?php echo $u['id']; ?>, <?php echo htmlspecialchars(json_encode($u['username']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($u['email']), ENT_QUOTES); ?>)">
+                      Delete
+                    </button>
+                  <?php endif; ?>
                   <?php if ($canPromote): ?>
                     <form method="POST" style="display:inline;">
                       <input type="hidden" name="action"    value="promote_to_admin"/>
@@ -259,7 +270,7 @@ $conn->close();
                               onclick="return confirm('Demote this admin to user?')">Demote</button>
                     </form>
                   <?php endif; ?>
-                  <?php if (!$canBan && !$canUnban && !$canPromote && !$canDemote): ?>
+                  <?php if (!$canBan && !$canUnban && !$canPromote && !$canDemote && !$canDelete): ?>
                     <span class="no-action">—</span>
                   <?php endif; ?>
                 </td>
@@ -563,6 +574,89 @@ new Chart(document.getElementById('pipelineChart').getContext('2d'), {
     plugins: { legend: { display: false } },
     cutout: '62%'
   }
+});
+</script>
+
+<!-- ── Delete User Modal ── -->
+<div id="deleteUserModal" class="modal fade" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content delete-modal-content">
+      <div class="modal-header delete-modal-header">
+        <h5 class="modal-title" id="deleteUserModalLabel">Delete User Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body delete-modal-body">
+        <div class="delete-warning">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <h6>Permanently Delete Account</h6>
+          <p id="deleteUserInfo" class="delete-user-info"></p>
+        </div>
+        <form id="deleteUserForm" method="POST" onsubmit="submitDeleteUserForm(event)">
+          <input type="hidden" name="action" value="delete_user"/>
+          <input type="hidden" name="target_id" id="deleteUserId" value=""/>
+          
+          <div class="form-group">
+            <label for="deletionReasonTextarea" class="form-label">Reason for Deletion</label>
+            <p class="form-text">Inform the user why their account is being deleted. This message will be sent to their email.</p>
+            <textarea 
+              id="deletionReasonTextarea"
+              name="deletion_reason"
+              class="form-control deletion-reason-textarea"
+              placeholder="e.g., Violation of community guidelines, Spam activity, User request..."
+              rows="5"
+              maxlength="1000"
+              required></textarea>
+            <div class="reason-char-count">
+              <span id="charCount">0</span>/1000 characters
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer delete-modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">Delete Account Permanently</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let deleteUserModal;
+
+function openDeleteUserModal(userId, username, email) {
+  const userInfo = document.getElementById('deleteUserInfo');
+  userInfo.innerHTML = `<strong>${username}</strong> (${email})`;
+  
+  document.getElementById('deleteUserId').value = userId;
+  document.getElementById('deletionReasonTextarea').value = '';
+  document.getElementById('charCount').textContent = '0';
+  
+  deleteUserModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+  deleteUserModal.show();
+}
+
+function confirmDeleteUser() {
+  const reason = document.getElementById('deletionReasonTextarea').value.trim();
+  
+  if (!reason) {
+    alert('Please provide a reason for the account deletion.');
+    return;
+  }
+  
+  if (!confirm('Are you sure? This action cannot be undone. The user account and all associated data will be permanently deleted.')) {
+    return;
+  }
+  
+  document.getElementById('deleteUserForm').submit();
+}
+
+// Character counter for deletion reason
+document.getElementById('deletionReasonTextarea').addEventListener('input', function() {
+  document.getElementById('charCount').textContent = this.value.length;
 });
 </script>
 
