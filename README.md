@@ -188,6 +188,32 @@ To prevent browser caching issues after an update, the backend appends a cache-b
 
 ---
 
+## Admin Features
+
+### User Account Deletion
+- **Location:** Admin Dashboard > User Management tab
+- **UI:** Delete button appears in the Actions column for eligible users
+- **Eligibility:** Super admins can delete any user (except other super admins); regular admins can only delete regular users
+- **Modal:**
+  - Warning banner with icon and user details (username, email)
+  - Textarea for admin to enter deletion reason (1000 char limit, required)
+  - Character counter
+  - Cancel and "Delete Account Permanently" buttons
+- **Implementation:**
+  - Modal UI and JS logic in `admin.php` with `openDeleteUserModal()` and `confirmDeleteUser()` functions
+  - `processDeleteUser()` method in `AdminRepository.php` handles email notification, deletion, and audit logging
+  - `send_account_deletion_email()` in `config.php` sends a dismissal email with the reason formatted clearly
+- **Safeguards:**
+  - Cannot delete own account
+  - Cannot delete super_admin accounts
+  - Admin role protection enforced via role checks
+- **Email & Logging:**
+  - Deletion reason is sent to user via SMTP before account removal
+  - Email send failures do not prevent deletion but are logged in the audit trail
+  - Action is logged with full details: admin username, target user, reason summary
+
+---
+
 ## Strangler Fig Pattern Migration
 
 FABulous is incrementally transitioning from a monolithic PHP application to microservices using the **Strangler Fig Pattern**. The strategy decouples frontend UI from backend business logic by gradually converting action scripts into RESTful JSON endpoints. Legacy endpoints continue to work during the transition.

@@ -30,7 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $targetID = (int)($_POST['target_id'] ?? 0);
 
     if ($action === 'ban_user' && $targetID) {
-        $actionMsg = $adminRepo->processBanUser($targetID, $adminID, $adminUsername, $isSuperAdmin);
+        $banReason = trim($_POST['ban_reason'] ?? '');
+        $actionMsg = $adminRepo->processBanUser($targetID, $adminID, $adminUsername, $isSuperAdmin, $banReason);
     } elseif ($action === 'unban_user' && $targetID) {
         $actionMsg = $adminRepo->processUnbanUser($targetID, $adminID, $adminUsername);
     } elseif ($action === 'delete_user' && $targetID) {
@@ -237,15 +238,23 @@ $conn->close();
                 <td><?php echo date('M d, Y', strtotime($u['created_at'])); ?></td>
                 <td class="action-cell">
                   <?php if ($canBan || $canUnban): ?>
-                    <form method="POST" style="display:inline;">
-                      <input type="hidden" name="action"    value="<?php echo $canUnban ? 'unban_user' : 'ban_user'; ?>"/>
-                      <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
-                      <button type="submit"
-                              class="action-btn <?php echo $canUnban ? 'btn-unban' : 'btn-ban'; ?>"
-                              onclick="return confirm('<?php echo $canUnban ? 'Unban' : 'Ban'; ?> this account?')">
-                        <?php echo $canUnban ? 'Unban' : 'Ban'; ?>
+                    <?php if ($canUnban): ?>
+                      <form method="POST" style="display:inline;">
+                        <input type="hidden" name="action"    value="unban_user"/>
+                        <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
+                        <button type="submit"
+                                class="action-btn btn-unban"
+                                onclick="return confirm('Unban this account?')">
+                          Unban
+                        </button>
+                      </form>
+                    <?php else: ?>
+                      <button type="button"
+                              class="action-btn btn-ban"
+                              onclick="openBanUserModal(<?php echo $u['id']; ?>, <?php echo htmlspecialchars(json_encode($u['username']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($u['email']), ENT_QUOTES); ?>)">
+                        Ban
                       </button>
-                    </form>
+                    <?php endif; ?>
                   <?php endif; ?>
                   <?php if ($canDelete): ?>
                     <button type="button" 
@@ -577,6 +586,51 @@ new Chart(document.getElementById('pipelineChart').getContext('2d'), {
 });
 </script>
 
+<!-- ── Ban User Modal ── -->
+<div id="banUserModal" class="modal fade" tabindex="-1" aria-labelledby="banUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content delete-modal-content">
+      <div class="modal-header ban-modal-header">
+        <h5 class="modal-title ban-modal-title" id="banUserModalLabel">Ban User Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body delete-modal-body">
+        <div class="ban-warning">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+          </svg>
+          <h6>Ban Account</h6>
+          <p id="banUserInfo" class="delete-user-info"></p>
+        </div>
+        <form id="banUserForm" method="POST" onsubmit="submitBanUserForm(event)">
+          <input type="hidden" name="action" value="ban_user"/>
+          <input type="hidden" name="target_id" id="banUserId" value=""/>
+
+          <div class="form-group">
+            <label for="banReasonTextarea" class="form-label">Reason for Ban</label>
+            <p class="form-text">Provide a reason for banning this account. This will be recorded in the audit log.</p>
+            <textarea
+              id="banReasonTextarea"
+              name="ban_reason"
+              class="form-control deletion-reason-textarea"
+              placeholder="e.g., Repeated violations of community guidelines, Harassment, Spam activity..."
+              rows="5"
+              maxlength="1000"></textarea>
+            <div class="reason-char-count">
+              <span id="banCharCount">0</span>/1000 characters
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer delete-modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn ban-modal-confirm-btn" onclick="confirmBanUser()">Ban Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Delete User Modal ── -->
 <div id="deleteUserModal" class="modal fade" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -657,6 +711,42 @@ function confirmDeleteUser() {
 // Character counter for deletion reason
 document.getElementById('deletionReasonTextarea').addEventListener('input', function() {
   document.getElementById('charCount').textContent = this.value.length;
+});
+</script>
+
+<script>
+let banUserModal;
+
+function openBanUserModal(userId, username, email) {
+  const userInfo = document.getElementById('banUserInfo');
+  userInfo.innerHTML = `<strong>${username}</strong> (${email})`;
+
+  document.getElementById('banUserId').value = userId;
+  document.getElementById('banReasonTextarea').value = '';
+  document.getElementById('banCharCount').textContent = '0';
+
+  banUserModal = new bootstrap.Modal(document.getElementById('banUserModal'));
+  banUserModal.show();
+}
+
+function confirmBanUser() {
+  const reason = document.getElementById('banReasonTextarea').value.trim();
+
+  if (!reason) {
+    alert('Please provide a reason for banning this account.');
+    return;
+  }
+
+  if (!confirm('Are you sure you want to ban this account? The user will lose access to the platform.')) {
+    return;
+  }
+
+  document.getElementById('banUserForm').submit();
+}
+
+// Character counter for ban reason
+document.getElementById('banReasonTextarea').addEventListener('input', function() {
+  document.getElementById('banCharCount').textContent = this.value.length;
 });
 </script>
 

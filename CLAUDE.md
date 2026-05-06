@@ -42,7 +42,24 @@
 
 ## Admin Features
 
-### User Account Deletion
+### User Account Banning
+- **Location:** Admin Dashboard > User Management tab
+- **UI:** Ban button appears in the Actions column for eligible users (super admins can ban admins or users; regular admins can ban users only). Banned users show an Unban button instead.
+- **Modal:** Clicking Ban opens a Bootstrap modal styled like the Delete modal but with an orange accent (`#e67e22`). It includes:
+  - Warning banner with a ban (circle-slash) SVG icon and user details (username, email)
+  - Textarea for admin to enter a ban reason (1000 char limit; required before confirming)
+  - Character counter
+  - Cancel and "Ban Account" buttons
+  - A second `confirm()` dialog as a final safeguard before submission
+- **Implementation:**
+  - Modal HTML uses `.ban-warning`, `.ban-modal-header`, `.ban-modal-title`, `.ban-modal-confirm-btn` classes in `admin.css`
+  - `openBanUserModal()` and `confirmBanUser()` JS functions in `admin.php`
+  - `ban_reason` is POSTed alongside `action=ban_user` and `target_id`
+  - `processBanUser()` in `AdminRepository.php` accepts the optional `$banReason` string and appends it to the audit log entry
+- **Page refresh:** POSTing the ban form causes a full redirect (`header('Location: admin.php?msg=...')`) which refreshes the user list and updates the status column automatically
+- **Unban:** Remains a direct inline form with a simple `confirm()` — no reason required
+
+
 - **Location:** Admin Dashboard > User Management tab
 - **UI:** Delete button appears in the Actions column for eligible users (only super admins can delete, or admins deleting regular users)
 - **Modal:** Clicking Delete opens a Bootstrap modal with:

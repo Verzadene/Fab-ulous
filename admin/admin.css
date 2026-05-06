@@ -651,3 +651,60 @@ html, body {
 @media print {
   .admin-filters { display: none !important; }
 }
+/* ── Ban User Modal ── */
+.ban-modal-header {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 24px;
+  background: rgba(0,0,0,0.2);
+}
+
+.ban-modal-title {
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  color: #e67e22;
+}
+
+.ban-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(230,126,34,0.10);
+  border: 1px solid rgba(230,126,34,0.30);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.ban-warning svg {
+  color: #e67e22;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ban-warning h6 {
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 700;
+  color: #e67e22;
+  margin: 0;
+}
+
+.ban-modal-confirm-btn {
+  background: #e67e22;
+  color: var(--text-white);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.ban-modal-confirm-btn:hover {
+  background: #ca6f1e;
+}

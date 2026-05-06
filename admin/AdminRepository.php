@@ -101,20 +101,21 @@ class AdminRepository {
         }
     }
 
-    public function processBanUser(int $targetID, int $adminID, string $adminUsername, bool $isSuperAdmin): string {
+    public function processBanUser(int $targetID, int $adminID, string $adminUsername, bool $isSuperAdmin, string $banReason = ''): string {
         $allowedRoles = $isSuperAdmin ? "('user','admin')" : "('user')";
         $upd = $this->conn->prepare("UPDATE accounts SET banned = 1 WHERE id = ? AND role IN $allowedRoles AND id != ?");
         $upd->bind_param("ii", $targetID, $adminID); $upd->execute(); $upd->close();
         
-        $sel = $this->conn->prepare("SELECT username, role FROM accounts WHERE id = ?");
+        $sel = $this->conn->prepare("SELECT username, email, role FROM accounts WHERE id = ?");
         $sel->bind_param("i", $targetID); $sel->execute();
         $row = $sel->get_result()->fetch_assoc(); $sel->close();
         
-        $logAction = "Banned user: " . ($row['username'] ?? 'Unknown');
+        $reasonSuffix = $banReason !== '' ? " | Reason: " . mb_substr($banReason, 0, 200) : '';
+        $logAction = "Banned user: " . ($row['username'] ?? 'Unknown') . $reasonSuffix;
         $vis = ($row['role'] ?? 'user') === 'user' ? 'admin' : 'super_admin';
         $this->logAdminAction($adminID, $adminUsername, $logAction, 'user', $targetID, $vis);
         
-        return "User banned.";
+        return "User " . htmlspecialchars($row['username'] ?? 'Unknown') . " has been banned.";
     }
 
     public function processUnbanUser(int $targetID, int $adminID, string $adminUsername): string {
