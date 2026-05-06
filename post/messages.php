@@ -51,44 +51,11 @@ $conn->close();
   <link rel="stylesheet" href="messages.css"/>
 </head>
 <body>
-  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-  <nav class="nav-drawer" id="navDrawer" aria-label="Quick navigation">
-    <div class="drawer-profile">
-      <div class="drawer-avatar">
-        <?php if ($myAvatarUrl): ?>
-          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
-        <?php else: ?>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
-            <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
-            <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
-          </svg>
-        <?php endif; ?>
-      </div>
-      <p class="drawer-name"><?php echo htmlspecialchars($name); ?></p>
-      <p class="drawer-username">@<?php echo htmlspecialchars($username); ?></p>
-    </div>
-    <a href="post.php" class="drawer-link" onclick="closeDrawer()">News Feed</a>
-    <a href="messages.php" class="drawer-link active" onclick="closeDrawer()">Messages</a>
-    <a href="commissions.php" class="drawer-link" onclick="closeDrawer()">Commissions</a>
-    <a href="../profile/profile.php" class="drawer-link" onclick="closeDrawer()">Settings</a>
-    <a href="../login/logout.php" class="drawer-link drawer-logout" onclick="closeDrawer()">Logout</a>
-  </nav>
-
-  <nav class="topnav">
-    <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
-    <button
-      type="button"
-      class="hamburger-btn"
-      id="burgerBtn"
-      aria-label="Toggle menu"
-      aria-controls="navDrawer"
-      aria-expanded="false"
-      onclick="toggleDrawer()"
-      style="margin-left: auto;"
-    >
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
+  <?php
+  $navActive = 'messages';
+  $navRoot = '../';
+  require __DIR__ . '/../includes/app_nav.php';
+  ?>
 
   <div class="dashboard-body messages-dashboard">
     <div class="messages-layout">

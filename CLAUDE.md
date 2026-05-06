@@ -38,6 +38,16 @@
 10. If a feature depends on a schema migration or config change, surface that clearly in the UI or docs instead of failing silently.
 11. Password reset emails should go through `send_password_reset_email()` in `config.php` so send failures can be surfaced consistently.
 
+## UI Patterns
+
+### Navigation & Help Button
+- The top navigation bar (`includes/app_nav.php`) contains a **burger menu** (left-slide drawer) and a **Help button**.
+- The Help button triggers a **Bootstrap Offcanvas panel** (slides in from the right, `id="helpOffcanvas"`).
+- The offcanvas explains the five main burger menu items: Commissions, Share a Project or Update, Updates/Notifications, Community (from Friends), and Settings.
+- **Do not** revert the Help button to a plain anchor link (`<a href="README.md">`). Keep it as a `<button data-bs-toggle="offcanvas">`.
+- All Help button and offcanvas styles live at the bottom of `post/post.css` under the `/* ─── Help Button ─── */` and `/* ─── Help Offcanvas ─── */` comment blocks. Since every authenticated page imports `post.css`, these styles are globally available.
+- The offcanvas uses the same green palette and `Josefin Sans` / `Inter` font pairing as the rest of the app. Preserve these tokens if editing the Help panel.
+
 ## Verification Checklist
 1. Run `php -l` on every edited PHP file.
 2. Re-test the affected route in the browser after each auth or upload change.

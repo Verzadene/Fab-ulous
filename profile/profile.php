@@ -33,50 +33,11 @@ $myAvatarUrl = get_current_user_avatar();
 </head>
 <body>
 
-  <!-- DRAWER OVERLAY -->
-  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
-
-  <!-- NAV DRAWER -->
-  <nav class="nav-drawer" id="navDrawer" aria-label="Quick navigation">
-    <div class="drawer-profile">
-      <div class="drawer-avatar">
-        <?php if ($myAvatarUrl): ?>
-          <img src="<?php echo htmlspecialchars($myAvatarUrl); ?>" class="drawer-avatar-img" alt="Profile" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"/>
-        <?php else: ?>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="52" height="52">
-            <circle cx="50" cy="35" r="22" fill="#1a1a1a"/>
-            <ellipse cx="50" cy="85" rx="35" ry="25" fill="#1a1a1a"/>
-          </svg>
-        <?php endif; ?>
-      </div>
-      <p class="drawer-name" id="drawerName"><?php echo htmlspecialchars($name); ?></p>
-      <p class="drawer-username" id="drawerUsername">@<?php echo htmlspecialchars($username); ?></p>
-    </div>
-    <a href="../post/post.php" class="drawer-link" onclick="closeDrawer()">News Feed</a>
-    <a href="../post/messages.php" class="drawer-link" onclick="closeDrawer()">Messages</a>
-    <a href="profile.php" class="drawer-link active" onclick="closeDrawer()">Settings</a>
-    <?php if ($isAdmin): ?>
-      <a href="../admin/admin.php" class="drawer-link drawer-admin" onclick="closeDrawer()">Admin Dashboard</a>
-    <?php endif; ?>
-    <a href="../login/logout.php" class="drawer-link drawer-logout" onclick="closeDrawer()">Logout</a>
-  </nav>
-
-  <!-- TOP NAV -->
-  <nav class="topnav">
-    <img src="../images/Top_Left_Nav_Logo.png" alt="FABulous Logo" class="nav-logo"/>
-    <button
-      type="button"
-      class="hamburger-btn"
-      id="burgerBtn"
-      aria-label="Toggle menu"
-      aria-controls="navDrawer"
-      aria-expanded="false"
-      onclick="toggleDrawer()"
-      style="margin-left: auto;"
-    >
-      <span></span><span></span><span></span>
-    </button>
-  </nav>
+  <?php
+  $navActive = 'settings';
+  $navRoot = '../';
+  require __DIR__ . '/../includes/app_nav.php';
+  ?>
 
   <!-- PAGE BODY -->
   <div class="profile-body">
