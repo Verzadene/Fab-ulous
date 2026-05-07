@@ -131,6 +131,35 @@ Fab-ulous/
 
 FABulous is a **folder-modular monolith** running on XAMPP (Apache + PHP 8.2 + MySQL). There is no framework; each feature area owns its folder, its PHP files, and its CSS. All pages share one configuration entry point.
 
+### Micro-Database Design
+
+The application uses **12 separate MySQL databases** (one per domain). Each `*Repository.php` class is the sole owner of its database domain. This enables independent scaling and isolation of each data domain.
+
+```
+config.php  →  db_connect('domain')  →  one of 12 MySQL databases
+                                         fab_ulous_accounts
+                                         fab_ulous_posts
+                                         fab_ulous_likes
+                                         fab_ulous_comments
+                                         fab_ulous_commissions
+                                         fab_ulous_commission_payments
+                                         fab_ulous_friendships
+                                         fab_ulous_notifications
+                                         fab_ulous_messages
+                                         fab_ulous_pending_registrations
+                                         fab_ulous_password_resets
+                                         fab_ulous_audit_log
+```
+
+### Cross-Database Query Pattern
+
+Because MySQL **does not support JOINs or foreign keys across databases**, all cross-domain reads use one of two patterns:
+
+1. **Fully-qualified names** — `\`db_name\`.\`table\`` in the SQL string. Used for read-heavy queries that run on one connection and reference other databases inline (e.g. `getFeed` in `PostRepository`, `getAllCommissions` in `CommissionRepository`).
+2. **Application-level aggregation** — fetch IDs from DB-A, then run a separate prepared statement against DB-B, merge in PHP. Used for all other cross-domain reads (e.g. `getComments`, `getUnreadNotifications`, `getConversation`).
+
+All cascading deletes (e.g. removing a user's posts, likes, friendships when the account is deleted) are handled explicitly in `AdminRepository::processDeleteUser()`.
+
 ### Dependency graph
 
 ```
@@ -149,18 +178,16 @@ landing/landing.html
 
 ### config.php — central hub
 
-Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent relative path). `config.php` provides:
+Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent). `config.php` provides:
 
-- All `define()` constants (DB credentials, SMTP, Google OAuth, PayMongo, MFA timers)
-- `db_connect()` — returns a `mysqli` connection
+- `DB_CONFIG` — array constant with credentials for all 12 databases (host, user, pass, name, port per domain)
+- `db_connect(string $domain): mysqli` — returns a cached `mysqli` connection for a given domain
 - `begin_user_session()` — writes `$_SESSION['user']` and `$_SESSION['mfa_verified']`
 - `dashboard_path_for_role()` — returns the correct redirect target per role
-- `clear_pending_auth()` — wipes `pending_mfa_user` + `pending_mfa_sent_at` from session
-- `login_lockout_remaining()` / `record_login_failure()` / `clear_login_lockout()` — session-based lockout
+- `create_notification()` — inserts a notification row into the notifications DB
 - `store_mfa_code()` / `clear_mfa_code()` / `accounts_support_mfa()` — MFA DB helpers
-- `send_mfa_code_email()` / `send_password_reset_email()` / `send_registration_verification_email()` — SMTP wrappers
-- `create_notification()` — inserts notification rows (checks `notification_type_supported()` first)
-- `mask_email_address()` — returns `j***@gmail.com` style masked address for display
+- `send_mfa_code_email()` / `send_password_reset_email()` / `send_registration_verification_email()` / `send_account_deletion_email()` — SMTP wrappers
+- `mask_email_address()` — returns `j***@gmail.com` style masked address
 
 ### Session variables
 
@@ -172,11 +199,6 @@ Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent rel
 | `$_SESSION['pending_mfa_sent_at']` | `int` | Unix timestamp when MFA code was last sent; controls resend cooldown |
 | `$_SESSION['{bucket}_attempts']` | `int` | Increments on each failed login attempt |
 | `$_SESSION['{bucket}_lockout_until']` | `int` | Unix timestamp when lockout expires |
-
-### Profile Picture Convention
-The application maintains a single source of truth for the logged-in user's avatar via the `get_current_user_avatar()` helper in `config.php`.
-This helper safely reads `$_SESSION['user']['profile_pic']` and falls back to querying the database if the session is stale.
-To prevent browser caching issues after an update, the backend appends a cache-busting timestamp (`?v=...`) to the avatar URL globally based on the file's modification time.
 
 ### Role hierarchy
 
@@ -348,58 +370,44 @@ Upload folders are outside the codebase but inside the web root (`uploads/`). Up
 
 ---
 
-## Database
+## Database Architecture
 
-### Fresh install
+FABulous uses a **micro-database architecture** — 12 independent MySQL databases, one per domain.
 
-Run **only** `database/setup.sql`. It creates all tables in their final schema including all columns added by later migrations. The migration files exist only for upgrading an **already-running** database.
+> **Why?** Independent databases allow each service domain to evolve its schema, scale, and be deployed independently — the first step in the Strangler Fig migration toward full microservices.
 
-```bash
-mysql -u root < database/setup.sql
-```
+> **Important:** MySQL does not enforce foreign key constraints across databases. All referential integrity and cascading deletes are handled explicitly in PHP, primarily in `AdminRepository::processDeleteUser()`.
 
-### Upgrade path (existing database)
+### The 12 databases
 
-Run migrations in version order. Each is safe to re-run (uses `IF NOT EXISTS` / `IF EXISTS` guards where possible).
+| Domain key | Database name | Table | Purpose |
+|---|---|---|---|
+| `accounts` | `fab_ulous_accounts` | `accounts` | Users and admins; role, banned, google_id, MFA columns, profile_pic |
+| `posts` | `fab_ulous_posts` | `posts` | User posts with optional image |
+| `likes` | `fab_ulous_likes` | `likes` | Post likes (unique per user per post) |
+| `comments` | `fab_ulous_comments` | `comments` | Post comments (`comment_text` column) |
+| `commissions` | `fab_ulous_commissions` | `commissions` | Commission requests; status, admin notes, amount |
+| `commission_payments` | `fab_ulous_commission_payments` | `commission_payments` | PayMongo payment records |
+| `friendships` | `fab_ulous_friendships` | `friendships` | Pairs with `user1_id` (requester) / `user2_id` (receiver), `pending`/`accepted` |
+| `notifications` | `fab_ulous_notifications` | `notifications` | Event notifications (like, comment, friend, commission, message) |
+| `messages` | `fab_ulous_messages` | `messages` | Direct messages (`senderID` / `receiverID` / `message_text`) |
+| `pending_registrations` | `fab_ulous_pending_registrations` | `pending_registrations` | Unverified email registrations |
+| `password_resets` | `fab_ulous_password_resets` | `password_resets` | 6-digit reset codes with expiry |
+| `audit_log` | `fab_ulous_audit_log` | `audit_log` | Admin actions with visibility separation |
 
-```bash
-mysql -u root fab_ulous < database/migration_v2.sql
-mysql -u root fab_ulous < database/migration_v3_mfa.sql
-mysql -u root fab_ulous < database/migration_v4.sql
-mysql -u root fab_ulous < database/migration_v5.sql
-mysql -u root fab_ulous < database/migration_v6_paymongo.sql
-mysql -u root fab_ulous < database/migration_v7_notifications.sql
-mysql -u root fab_ulous < database/migration_v8_profile_fields.sql
-```
+### Renamed columns (migration note)
 
-### Migration reference
+If you are migrating from an older monolithic schema, the following columns were renamed:
 
-| File | What it adds | Required by |
+| Table | Old column | New column |
 |---|---|---|
-| `setup.sql` | All tables for a fresh install | Fresh installs only |
-| `migration_v2.sql` | `super_admin` role; `friendships` table; `notifications` table (initial types); `commission_name` + `admin_note` columns on `commissions` | `post/friends.php`, `post/notifications.php`, admin commission notes |
-| `migration_v3_mfa.sql` | `mfa_code` + `mfa_code_expires_at` on `accounts` | `login/login.php`, `login/verify_mfa.php`, `admin/admin_login.php` — **MFA will not function without this** |
-| `migration_v4.sql` | `profile_pic` on `accounts`; `pending_registrations` table | `profile/profile.php`, `register/register.php`, `register/verify_registration.php` |
-| `migration_v5.sql` | Expanded `commissions.status` ENUM; `visibility_role` on `audit_log`; `password_resets` table; `messages` table | `login/forgot_password.php`, `login/reset_password.php`, `post/messages.php` |
-| `migration_v6_paymongo.sql` | `commission_payments` table | `post/paymongo_checkout.php`, `post/paymongo_webhook.php` |
-| `migration_v7_notifications.sql` | Expanded `notifications.type` ENUM (`commission_submitted`, `commission_approved`, `commission_updated`, `commission_paid`, `message`) | `post/commissions.php`, `post/paymongo_webhook.php`, `post/messages_api.php` |
+| `friendships` | `requesterID` | `user1_id` |
+| `friendships` | `receiverID` | `user2_id` |
+| `messages` | `sender_id` | `senderID` |
+| `messages` | `receiver_id` | `receiverID` |
+| `comments` | `content` | `comment_text` |
 
-### Core table summary
-
-| Table | Primary key | Purpose |
-|---|---|---|
-| `accounts` | `id` | Users and admins; includes role, banned flag, google_id, mfa columns, profile_pic |
-| `posts` | `postID` | User posts with optional image |
-| `likes` | `likeID` | Post likes (unique per user per post) |
-| `comments` | `commentID` | Post comments |
-| `commissions` | `commissionID` | Commission requests; status + admin notes + amount tracked here |
-| `commission_payments` | `paymentID` | PayMongo payment records linked to commissions |
-| `friendships` | `friendshipID` | Directed friendship pairs with `pending`/`accepted` state |
-| `notifications` | `notifID` | Event notifications (like, comment, friend, commission, message) |
-| `messages` | `messageID` | Direct message threads between two accounts |
-| `pending_registrations` | `id` | Staging table for unverified email registrations |
-| `password_resets` | `id` | 6-digit reset codes with expiry and used flag |
-| `audit_log` | `logID` | Admin actions with visibility separation (admin vs super_admin) |
+> **Existing installs:** if your `fab_ulous_messages.messages` table still has `sender_id` / `receiver_id`, run `database/migration_messages_canonical.sql` to rename them in place without losing message history. Idempotent — safe on already-canonical databases.
 
 ---
 
@@ -409,64 +417,84 @@ mysql -u root fab_ulous < database/migration_v8_profile_fields.sql
 
 ```bash
 git clone https://github.com/Verzadene/Fab-ulous.git
-# Move to XAMPP:
-# C:\xampp\htdocs\Fab-ulous
+# Move to XAMPP htdocs:
+# Windows: C:\xampp\htdocs\Fab-ulous
+# macOS/Linux: /Applications/XAMPP/htdocs/Fab-ulous
 ```
 
 ### 2. Start XAMPP
 
-Start **Apache** and **MySQL** from the XAMPP control panel.
+Start **Apache** and **MySQL** from the XAMPP control panel. You do not need to create any databases manually.
 
-### 3. Create the database and run setup
-
-Open `http://localhost/phpmyadmin`, create a database named `fab_ulous`, then run:
-
-```sql
--- Fresh install (creates everything):
-source C:/xampp/htdocs/Fab-ulous/database/setup.sql
-```
-
-Or via CLI:
+### 3. Run the micro-database setup script
 
 ```bash
-mysql -u root < database/setup.sql
+# Fresh install — creates all 12 databases and their tables from scratch
+mysql -u root < C:/xampp/htdocs/Fab-ulous/database/setup_micro_dbs.sql
+
+# Existing install only — rename legacy messages.sender_id / receiver_id
+# to canonical senderID / receiverID. Idempotent; no-op on fresh installs.
+mysql -u root < C:/xampp/htdocs/Fab-ulous/database/migration_messages_canonical.sql
 ```
 
-### 4. Configure `config.php`
+This creates all 12 databases and their tables from scratch. The old `setup.sql` and `migration_v*.sql` files are **deprecated** — do not run them on a fresh install. The `migration_messages_canonical.sql` script is only needed when upgrading a database that predates the messages column rename; it checks `information_schema` and skips when columns are already canonical.
 
-Open `config.php` and fill in or verify:
+### 4. Configure local credentials via `config.local.php`
+
+Create `config.local.php` in the project root (it is gitignored). This file must define `DB_CONFIG` **before** `config.php` loads it (since PHP constants cannot be redefined).
+
+A minimal `config.local.php`:
 
 ```php
-// Database (defaults work for stock XAMPP)
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'fab_ulous');
+<?php
+// ── Database (define DB_CONFIG first — it must be set before config.php) ──
+define('DB_CONFIG', [
+    'accounts'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_accounts',              'port' => 3306],
+    'posts'                 => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_posts',                 'port' => 3306],
+    'likes'                 => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_likes',                 'port' => 3306],
+    'comments'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_comments',              'port' => 3306],
+    'commissions'           => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_commissions',           'port' => 3306],
+    'commission_payments'   => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_commission_payments',   'port' => 3306],
+    'friendships'           => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_friendships',           'port' => 3306],
+    'notifications'         => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_notifications',         'port' => 3306],
+    'messages'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_messages',              'port' => 3306],
+    'pending_registrations' => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_pending_registrations', 'port' => 3306],
+    'password_resets'       => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_password_resets',       'port' => 3306],
+    'audit_log'             => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_audit_log',             'port' => 3306],
+]);
 
-// SMTP — required for MFA codes, registration verification, and password reset
-define('SMTP_HOST',     'smtp.gmail.com');
-define('SMTP_PORT',     465);
-define('SMTP_USERNAME', 'your-email@gmail.com');
-define('SMTP_PASSWORD', 'your-app-password');
+// ── SMTP (required for MFA, registration, password reset) ──
+define('SMTP_HOST',         'smtp.gmail.com');
+define('SMTP_PORT',         465);
+define('SMTP_ENCRYPTION',   'ssl');
+define('SMTP_USERNAME',     'your-email@gmail.com');
+define('SMTP_PASSWORD',     'your-app-password');
+define('MAIL_FROM_ADDRESS', 'your-email@gmail.com');
+define('MAIL_FROM_NAME',    'FABulous');
 
-// Google OAuth — required for "Continue with Google"
+// ── Google OAuth ──
 define('GOOGLE_CLIENT_ID',     'your-client-id.apps.googleusercontent.com');
 define('GOOGLE_CLIENT_SECRET', 'your-client-secret');
 define('GOOGLE_REDIRECT_URI',  'http://localhost/Fab-ulous/oauth/oauth2callback.php');
 
-// PayMongo — required for commission payment checkout
-define('PAYMONGO_SECRET_KEY',      'sk_test_...');
-define('PAYMONGO_WEBHOOK_SECRET',  'whsk_...');
+// ── PayMongo ──
+define('PAYMONGO_SECRET_KEY',    'sk_test_...');
+define('PAYMONGO_WEBHOOK_SECRET','whsk_...');
+
+define('APP_ENV', 'local');
+define('APP_URL', 'http://localhost/Fab-ulous');
 ```
 
-Alternatively, create an untracked `config.local.php` in the project root and define overrides there — `config.php` does `defined('X') || define('X', ...)` so local values take precedence when defined first.
+> **Why define `DB_CONFIG` in `config.local.php`?**  
+> `config.php` uses `defined('DB_CONFIG') || define('DB_CONFIG', [...])`. If `config.local.php` defines it first, `config.php` skips its default. This is the only way to override the database names without editing the tracked `config.php`.
 
 ### 5. Create an admin account
 
-Register normally, then promote via SQL:
+Register normally at `http://localhost/Fab-ulous/register/register.html`, then promote via SQL:
 
 ```sql
-UPDATE accounts SET role = 'admin' WHERE username = 'your_username';
+USE fab_ulous_accounts;
+UPDATE accounts SET role = 'admin'       WHERE username = 'your_username';
 -- Or for super admin:
 UPDATE accounts SET role = 'super_admin' WHERE username = 'your_username';
 ```
