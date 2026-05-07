@@ -126,7 +126,7 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
         <h1 class="admin-title">Dashboard</h1>
       </div>
       <div class="header-actions">
-        <button class="btn-print" onclick="window.print()">&#128438; Print Report</button>
+        <button class="btn-print" onclick="exportCurrentTabCSV()">&#128190; Export CSV</button>
         <img src="../images/Top_Left_Nav_Logo.png" alt="" class="header-logo"/>
       </div>
     </div>
@@ -507,6 +507,119 @@ function switchTab(name, btn) {
   document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   btn.classList.add('active');
+}
+
+// ── CSV Export (respects active tab + current filters) ──────────
+function csvEscape(value) {
+  const s = (value ?? '').toString().replace(/\s+/g, ' ').trim();
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function rowIsVisible(row) {
+  // A row is "filtered out" only when something explicitly hid it (display:none)
+  return row.style.display !== 'none';
+}
+
+function exportTableCSV(tableId, headers, columnIndexes) {
+  const table = document.getElementById(tableId);
+  if (!table) return '';
+  const lines = [headers.map(csvEscape).join(',')];
+  const rows = table.querySelectorAll('tbody tr:not(.empty-row)');
+  rows.forEach(row => {
+    if (!rowIsVisible(row)) return;
+    const cells = row.querySelectorAll('td');
+    const values = columnIndexes.map(i => {
+      const cell = cells[i];
+      if (!cell) return '';
+      // Prefer <details> summary over the expanded body so long captions stay one line
+      const summary = cell.querySelector('details summary');
+      return summary ? summary.textContent : cell.textContent;
+    });
+    lines.push(values.map(csvEscape).join(','));
+  });
+  return lines.join('\r\n');
+}
+
+function exportDashboardCSV() {
+  const metricCards = document.querySelectorAll('#tab-dashboard .metric-card');
+  const metricLines = ['Metric,Value'];
+  metricCards.forEach(card => {
+    const title = card.querySelector('.metric-title')?.textContent || '';
+    const value = card.querySelector('.metric-value')?.textContent || '';
+    metricLines.push([title, value].map(csvEscape).join(','));
+  });
+
+  const auditLines = ['', 'Audit Log', 'Admin,Full Name,Action,Timestamp'];
+  document.querySelectorAll('#auditList .audit-entry').forEach(entry => {
+    if (!rowIsVisible(entry)) return;
+    const admin = entry.querySelector('.audit-admin')?.textContent || '';
+    const fullName = (entry.querySelector('.audit-fullname')?.textContent || '').replace(/^\(|\)$/g, '');
+    const time = entry.querySelector('.audit-time')?.textContent || '';
+    // Action text = entry text with the labelled spans stripped out
+    const clone = entry.cloneNode(true);
+    clone.querySelectorAll('.audit-admin, .audit-fullname, .audit-time').forEach(n => n.remove());
+    const action = clone.textContent.replace(/^[\s:]+/, '').trim();
+    auditLines.push([admin, fullName, action, time].map(csvEscape).join(','));
+  });
+
+  return metricLines.concat(auditLines).join('\r\n');
+}
+
+function downloadCSV(csv, filename) {
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function exportCurrentTabCSV() {
+  const active = document.querySelector('.tab-content.active');
+  if (!active) return;
+  const today = new Date().toISOString().slice(0, 10);
+  let csv = '';
+  let filename = `fabulous-${today}.csv`;
+
+  switch (active.id) {
+    case 'tab-dashboard':
+      csv = exportDashboardCSV();
+      filename = `fabulous-dashboard-${today}.csv`;
+      break;
+    case 'tab-users':
+      csv = exportTableCSV(
+        'usersTable',
+        ['ID', 'Name', 'Username', 'Email', 'Role', 'Status', 'Joined'],
+        [0, 1, 2, 3, 4, 5, 6]
+      );
+      filename = `fabulous-users-${today}.csv`;
+      break;
+    case 'tab-feed':
+      csv = exportTableCSV(
+        'feedTable',
+        ['Post ID', 'Author', 'Caption', 'Likes', 'Comments', 'Posted'],
+        [0, 1, 2, 3, 4, 5]
+      );
+      filename = `fabulous-feed-${today}.csv`;
+      break;
+    case 'tab-commissions':
+      csv = exportTableCSV(
+        'commTable',
+        ['ID', 'Requester', 'Email', 'Title', 'Description', 'Amount', 'Status', 'Submitted', 'Admin Note'],
+        [0, 1, 2, 3, 4, 5, 6, 7, 8]
+      );
+      filename = `fabulous-commissions-${today}.csv`;
+      break;
+  }
+
+  if (!csv) {
+    showActionMessage('Nothing to export on this tab.', true);
+    return;
+  }
+  downloadCSV(csv, filename);
 }
 
 const liveActionMsg = document.getElementById('liveActionMsg');

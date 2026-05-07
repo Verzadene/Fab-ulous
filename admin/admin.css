@@ -332,9 +332,12 @@ html, body {
   margin-right: 5px;
   vertical-align: middle;
 }
+/* Aligned with Chart.js dataset colors in admin.php (pipelineChart) */
 .legend-dot.pending    { background: #f39c12; }
-.legend-dot.inprogress { background: #3498db; }
-.legend-dot.completed  { background: #2ecc71; }
+.legend-dot.accepted   { background: #2ecc71; }
+.legend-dot.ongoing    { background: #3498db; }
+.legend-dot.delayed    { background: #e67e22; }
+.legend-dot.completed  { background: #27ae60; }
 .legend-dot.cancelled  { background: #e74c3c; }
 
 /* ── Section Heading ── */
