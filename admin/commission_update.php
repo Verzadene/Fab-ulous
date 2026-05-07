@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../post/CommissionRepository.php'; // Include CommissionRepository
 
 header('Content-Type: application/json');
 
@@ -21,48 +22,18 @@ if (!$commissionId || !in_array($status, $allowedStatuses, true)) {
     exit;
 }
 
-$conn = db_connect();
-$ownerId = 0;
-$previousStatus = '';
-$existing = $conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
-if ($existing) {
-    $existing->bind_param('i', $commissionId);
-    $existing->execute();
-    $existingRow = $existing->get_result()->fetch_assoc();
-    $existing->close();
-    $ownerId = (int) ($existingRow['userID'] ?? 0);
-    $previousStatus = (string) ($existingRow['status'] ?? '');
-}
+$commissionRepo = new CommissionRepository('db_connect');
+$adminId = (int) $_SESSION['user']['id'];
+$adminUsername = $_SESSION['user']['username'];
 
-$stmt = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
-$stmt->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
-$success = $stmt->execute();
-$stmt->close();
+$result = $commissionRepo->processUpdateCommission($commissionId, $status, $adminNote, $amount, $adminId, $adminUsername, $allowedStatuses);
 
-if ($success) {
-    $adminId = (int) $_SESSION['user']['id'];
-    $adminUsername = $_SESSION['user']['username'];
-    if ($ownerId > 0 && $previousStatus !== $status) {
-        $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
-        create_notification($conn, $ownerId, $adminId, $notifType, null, $commissionId);
-    }
-
-    $action = "Updated commission #{$commissionId} to {$status}";
-    $log = $conn->prepare(
-        "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
-         VALUES (?, ?, ?, 'commission', ?, 'admin')"
-    );
-    if ($log) {
-        $log->bind_param('issi', $adminId, $adminUsername, $action, $commissionId);
-        $log->execute();
-        $log->close();
-    }
-}
-
-$conn->close();
+// The processUpdateCommission method already returns the necessary data,
+// so we just need to echo it.
 echo json_encode([
-    'success' => $success,
-    'status' => $status,
-    'amount' => $amount,
-    'amount_formatted' => '₱' . number_format($amount, 2),
+    'success' => $result['success'],
+    'status' => $result['status'] ?? $status, // Fallback to $status if not in result
+    'amount' => $result['amount'] ?? $amount, // Fallback to $amount if not in result
+    'amount_formatted' => $result['amount_formatted'] ?? '₱' . number_format($amount, 2),
+    'error' => $result['error'] ?? null,
 ]);

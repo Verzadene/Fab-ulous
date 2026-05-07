@@ -7,7 +7,7 @@ if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admi
     exit;
 }
 
-$conn = db_connect();
+$connAccounts = db_connect('accounts'); // Connect to the accounts database
 
 $error = '';
 $lockoutBucket = 'fab_global_login';
@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($lockoutRemaining > 0) {
         $error = '';
     } else {
-        $stmt = $conn->prepare(
+        $stmt = $connAccounts->prepare(
             "SELECT * FROM accounts WHERE (username = ? OR email = ?) AND role IN ('admin', 'super_admin')"
         );
         $stmt->bind_param("ss", $input, $input);
@@ -31,12 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user['banned']) {
                 $error = 'This admin account has been suspended.';
             } else {
-                if (!accounts_support_mfa($conn)) {
+                if (!accounts_support_mfa()) { // No longer takes $conn
                     $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
                 } else {
                     $code = (string) random_int(100000, 999999);
 
-                    if (!store_mfa_code($conn, (int) $user['id'], $code)) {
+                    if (!store_mfa_code((int) $user['id'], $code)) { // No longer takes $conn
                         $error = 'We could not start MFA verification. Please try again.';
                     } else {
                         clear_login_lockout($lockoutBucket);
@@ -61,11 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         if (!$mailSent) {
                             clear_pending_auth();
-                            clear_mfa_code($conn, (int) $user['id']);
+                            clear_mfa_code((int) $user['id']); // No longer takes $conn
                             $error = get_last_mail_error() ?: 'A verification code could not be sent to this admin email address.';
                         } else {
                             header('Location: ../login/verify_mfa.php');
-                            $conn->close();
                             exit;
                         }
                     }
@@ -79,7 +78,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-$conn->close();
 $lockoutRemaining = login_lockout_remaining($lockoutBucket);
 $isLocked = $lockoutRemaining > 0;
 ?>

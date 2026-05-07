@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/AdminRepository.php';
+require_once __DIR__ . '/../post/CommissionRepository.php'; // For commission actions
 
 // RBAC: admin and super_admin only
 $role = $_SESSION['user']['role'] ?? '';
@@ -15,13 +16,12 @@ if (empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-
 $adminID       = (int)$_SESSION['user']['id'];
 $adminUsername = $_SESSION['user']['username'];
 $isSuperAdmin  = ($role === 'super_admin');
 
-$adminRepo = new AdminRepository($conn);
+$adminRepo = new AdminRepository('db_connect');
+$commissionRepo = new CommissionRepository('db_connect'); // Instantiate CommissionRepository
 
 // ── Handle POST Actions ──────────────────────────────────────────
 $actionMsg = '';
@@ -42,12 +42,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     } elseif ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
         $actionMsg = $adminRepo->processPromoteToAdmin($targetID, $adminID, $adminUsername);
     } elseif ($action === 'demote_to_user' && $targetID && $isSuperAdmin) {
-        $actionMsg = $adminRepo->processDemoteToUser($targetID, $adminID, $adminUsername);
+        $actionMsg = $adminRepo->processDemoteToUser($targetID, $adminID, $adminUsername); // Corrected call
     } elseif ($action === 'update_commission' && $targetID) {
         $newStatus = $_POST['commission_status'] ?? '';
         $adminNote = $_POST['admin_note'] ?? '';
         $amount = (float)($_POST['amount'] ?? 0);
-        $actionMsg = $adminRepo->processUpdateCommission($targetID, $adminID, $newStatus, $adminNote, $amount);
+        // Delegate commission updates to CommissionRepository
+        $result = $commissionRepo->processUpdateCommission($targetID, $newStatus, $adminNote, $amount, $adminID, $adminUsername, ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled']);
+        $actionMsg = $result['success'] ? $result['message'] ?? "Commission #{$targetID} updated." : $result['error'];
     }
 
     header('Location: admin.php?msg=' . urlencode($actionMsg));
@@ -80,9 +82,7 @@ $users = $adminRepo->getAllUsers();
 $allPosts = $adminRepo->getAllPosts();
 
 // ── Commissions ──────────────────────────────────────────────────
-$commissions = $adminRepo->getAllCommissions();
-
-$conn->close();
+$commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call CommissionRepository for all commissions
 ?>
 <!DOCTYPE html>
 <html lang="en">
