@@ -98,6 +98,7 @@ Fab-ulous/
 │   ├── MessageRepository.php     # DB abstraction: Messaging operations
 │   ├── NotificationRepository.php# DB abstraction: Notification operations
 │   ├── CommissionRepository.php  # DB abstraction: Commission requests and updates
+│   ├── PaymentRepository.php     # DB abstraction: PayMongo payment lifecycle (pending → checkout → paid)
 │   ├── commissions.php           # Commission submit (users) + status management (admins)
 │   ├── commissions.css
 │   ├── paymongo_checkout.php     # POST handler: create PayMongo checkout session; redirect to payment URL
@@ -557,8 +558,8 @@ http://localhost/Fab-ulous/landing/landing.html
 | `post/delete_post.php` | POST | Delete post (owner only) | `post/post.php` JS |
 | `post/create_post.php` | POST | Create post with optional image | `post/post.php` |
 | `post/commissions.php` | GET, POST | List commissions (JSON); submit commission (user); update status (admin) | `post/commissions.php` JS |
-| `post/paymongo_checkout.php` | POST | Create PayMongo checkout session | `post/commissions.php` JS |
-| `post/paymongo_webhook.php` | POST | Receive PayMongo webhook; update `commission_payments` | PayMongo servers |
+| `post/paymongo_checkout.php` | POST | Create PayMongo checkout session (delegates to `PaymentRepository`) | `post/commissions.php` JS |
+| `post/paymongo_webhook.php` | POST | Receive PayMongo webhook; idempotently mark paid via `PaymentRepository` and fire `commission_paid` notification | PayMongo servers |
 | `admin/commission_update.php` | POST | Update commission from admin dashboard | `admin/admin.php` |
 
 ---
