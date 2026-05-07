@@ -57,7 +57,7 @@
   - `ban_reason` is POSTed alongside `action=ban_user` and `target_id`
   - `processBanUser()` in `AdminRepository.php` accepts the optional `$banReason` string and appends it to the audit log entry
 - **Page refresh:** POSTing the ban form causes a full redirect (`header('Location: admin.php?msg=...')`) which refreshes the user list and updates the status column automatically
-- **Unban:** Remains a direct inline form with a simple `confirm()` — no reason required
+- **Unban:** Opens a dedicated Bootstrap modal (`unbanUserModal`) with a green-accented confirmation panel showing the target user's username and email. No reason textarea is required. Clicking "Restore Access" shows a `confirm()` dialog before submitting. Uses `openUnbanUserModal()` and `confirmUnbanUser()` JS functions in `admin.php`. Modal uses `.unban-warning`, `.unban-modal-header`, `.unban-modal-title`, `.unban-modal-confirm-btn` classes in `admin.css`.
 
 
 - **Location:** Admin Dashboard > User Management tab

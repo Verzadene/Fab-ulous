@@ -708,3 +708,68 @@ html, body {
 .ban-modal-confirm-btn:hover {
   background: #ca6f1e;
 }
+
+/* ── Unban User Modal ── */
+.unban-modal-header {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 24px;
+  background: rgba(0,0,0,0.2);
+}
+
+.unban-modal-title {
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--green-active);
+}
+
+.unban-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 20px;
+  background: rgba(119,204,129,0.10);
+  border: 1px solid rgba(119,204,129,0.30);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.unban-warning svg {
+  color: var(--green-active);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.unban-warning h6 {
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--green-active);
+  margin: 0;
+}
+
+.unban-description {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(255,255,255,0.65);
+  margin: 0;
+}
+
+.unban-modal-confirm-btn {
+  background: var(--green-active);
+  color: #0d1a12;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.unban-modal-confirm-btn:hover {
+  background: #5fcc6e;
+}

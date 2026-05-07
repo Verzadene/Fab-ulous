@@ -190,6 +190,27 @@ To prevent browser caching issues after an update, the backend appends a cache-b
 
 ## Admin Features
 
+### User Account Banning & Unbanning
+- **Location:** Admin Dashboard > User Management tab
+- **Ban eligibility:** Super admins can ban admins or regular users; regular admins can only ban regular users. Banned users show an Unban button instead of Ban.
+- **Ban modal:** Clicking Ban opens a Bootstrap modal with an orange accent (`#e67e22`):
+  - Warning banner with ban (circle-slash) SVG icon and target user details (username, email)
+  - Textarea for ban reason (1000 char limit, required)
+  - Character counter
+  - Cancel and "Ban Account" buttons; a second `confirm()` dialog before submission
+- **Unban modal:** Clicking Unban opens a Bootstrap modal with a green accent (`var(--green-active)`):
+  - Confirmation panel with checkmark SVG icon and target user details (username, email)
+  - Brief description of the action (no reason required)
+  - Cancel and "Restore Access" buttons; a `confirm()` dialog before submission
+- **Implementation:**
+  - `openBanUserModal()` / `confirmBanUser()` and `openUnbanUserModal()` / `confirmUnbanUser()` JS functions in `admin.php`
+  - Ban CSS: `.ban-warning`, `.ban-modal-header`, `.ban-modal-title`, `.ban-modal-confirm-btn` in `admin.css`
+  - Unban CSS: `.unban-warning`, `.unban-modal-header`, `.unban-modal-title`, `.unban-modal-confirm-btn` in `admin.css`
+  - `processBanUser()` and `processUnbanUser()` in `AdminRepository.php` handle DB update and audit logging
+- **Page refresh:** POST → `header('Location: admin.php?msg=...')` redirect refreshes user list and status column automatically
+
+---
+
 ### User Account Deletion
 - **Location:** Admin Dashboard > User Management tab
 - **UI:** Delete button appears in the Actions column for eligible users

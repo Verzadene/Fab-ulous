@@ -239,15 +239,11 @@ $conn->close();
                 <td class="action-cell">
                   <?php if ($canBan || $canUnban): ?>
                     <?php if ($canUnban): ?>
-                      <form method="POST" style="display:inline;">
-                        <input type="hidden" name="action"    value="unban_user"/>
-                        <input type="hidden" name="target_id" value="<?php echo $u['id']; ?>"/>
-                        <button type="submit"
-                                class="action-btn btn-unban"
-                                onclick="return confirm('Unban this account?')">
-                          Unban
-                        </button>
-                      </form>
+                      <button type="button"
+                              class="action-btn btn-unban"
+                              onclick="openUnbanUserModal(<?php echo $u['id']; ?>, <?php echo htmlspecialchars(json_encode($u['username']), ENT_QUOTES); ?>, <?php echo htmlspecialchars(json_encode($u['email']), ENT_QUOTES); ?>)">
+                        Unban
+                      </button>
                     <?php else: ?>
                       <button type="button"
                               class="action-btn btn-ban"
@@ -631,6 +627,40 @@ new Chart(document.getElementById('pipelineChart').getContext('2d'), {
   </div>
 </div>
 
+<!-- ── Unban User Modal ── -->
+<div id="unbanUserModal" class="modal fade" tabindex="-1" aria-labelledby="unbanUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content delete-modal-content">
+      <div class="modal-header unban-modal-header">
+        <h5 class="modal-title unban-modal-title" id="unbanUserModalLabel">Unban User Account</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body delete-modal-body">
+        <div class="unban-warning">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="9 12 11 14 15 10"></polyline>
+          </svg>
+          <h6>Restore Account Access</h6>
+          <p id="unbanUserInfo" class="delete-user-info"></p>
+        </div>
+        <p class="unban-description">
+          Unbanning this account will restore the user's ability to log in and use the platform.
+          This action will be recorded in the audit log.
+        </p>
+        <form id="unbanUserForm" method="POST">
+          <input type="hidden" name="action" value="unban_user"/>
+          <input type="hidden" name="target_id" id="unbanUserId" value=""/>
+        </form>
+      </div>
+      <div class="modal-footer delete-modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn unban-modal-confirm-btn" onclick="confirmUnbanUser()">Restore Access</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Delete User Modal ── -->
 <div id="deleteUserModal" class="modal fade" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -748,6 +778,27 @@ function confirmBanUser() {
 document.getElementById('banReasonTextarea').addEventListener('input', function() {
   document.getElementById('banCharCount').textContent = this.value.length;
 });
+</script>
+
+<script>
+let unbanUserModal;
+
+function openUnbanUserModal(userId, username, email) {
+  const userInfo = document.getElementById('unbanUserInfo');
+  userInfo.innerHTML = `<strong>${username}</strong> (${email})`;
+
+  document.getElementById('unbanUserId').value = userId;
+
+  unbanUserModal = new bootstrap.Modal(document.getElementById('unbanUserModal'));
+  unbanUserModal.show();
+}
+
+function confirmUnbanUser() {
+  if (!confirm('Restore access for this account? The user will be able to log in again.')) {
+    return;
+  }
+  document.getElementById('unbanUserForm').submit();
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
