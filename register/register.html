@@ -84,6 +84,21 @@
                  placeholder="Password" autocomplete="new-password" required/>
         </div>
 
+        <div class="password-checks" id="passwordChecks">
+          <div class="check-row" id="check-length">
+            <span class="check-icon">○</span>
+            <span class="check-text">At least 8 characters</span>
+          </div>
+          <div class="check-row" id="check-special">
+            <span class="check-icon">○</span>
+            <span class="check-text">At least 1 special character (!@#…)</span>
+          </div>
+          <div class="check-row" id="check-number">
+            <span class="check-icon">○</span>
+            <span class="check-text">At least 1 number</span>
+          </div>
+        </div>
+
         <div class="input-group">
           <input type="password" id="confirmPassword" name="confirmPassword" class="input-field"
                  placeholder="Confirm Password" autocomplete="new-password" required/>

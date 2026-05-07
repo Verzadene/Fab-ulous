@@ -19,33 +19,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// --- Password strength checklist ---
+function setCheck(id, met) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  row.classList.toggle('met', met);
+  const icon = row.querySelector('.check-icon');
+  if (icon) icon.textContent = met ? '✓' : '○';
+}
+
+function updatePasswordChecks(password) {
+  setCheck('check-length',  password.length >= 8);
+  setCheck('check-special', /[^a-zA-Z0-9]/.test(password));
+  setCheck('check-number',  /[0-9]/.test(password));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const passInput = document.getElementById('password');
+  if (passInput) {
+    passInput.addEventListener('input', () => updatePasswordChecks(passInput.value));
+  }
+});
+
 document.getElementById('regForm').addEventListener('submit', function(e) {
   e.preventDefault();
 
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirmPassword').value;
 
-  // Check minimum length
-  if (password.length < 16) {
-    alert('Password must be at least 16 characters long.');
+  if (password.length < 8) {
+    alert('Password must be at least 8 characters long.');
     return;
   }
 
-  // Check for at least 2 special characters
   const specialChars = password.match(/[^a-zA-Z0-9]/g);
-  if (!specialChars || specialChars.length < 2) {
-    alert('Password must contain at least 2 special characters (e.g. @, #, !).');
+  if (!specialChars || specialChars.length < 1) {
+    alert('Password must contain at least 1 special character (e.g. @, #, !).');
     return;
   }
 
-  // Check for at least 2 numbers
   const numbers = password.match(/[0-9]/g);
-  if (!numbers || numbers.length < 2) {
-    alert('Password must contain at least 2 numbers.');
+  if (!numbers || numbers.length < 1) {
+    alert('Password must contain at least 1 number.');
     return;
   }
 
-  // Check if passwords match
   if (password !== confirmPassword) {
     alert('Passwords do not match. Please try again.');
     document.getElementById('confirmPassword').value = '';
@@ -53,7 +71,6 @@ document.getElementById('regForm').addEventListener('submit', function(e) {
     return;
   }
 
-  // All checks passed — submit the form
   this.submit();
 });
 
@@ -62,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const error  = params.get('error');
   const errDiv = document.getElementById('errorMsg');
-  
+
   if (error === 'email_taken') {
     errDiv.textContent = 'This email is already registered. Please log in instead.';
     errDiv.style.display = 'block';
@@ -70,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     errDiv.textContent = 'This username is already taken. Please choose another.';
     errDiv.style.display = 'block';
   } else if (error === 'weak_password') {
-    errDiv.textContent = 'Password must be at least 16 characters and contain 2+ numbers and 2+ special characters.';
+    errDiv.textContent = 'Password must be at least 8 characters and contain 1+ number and 1+ special character.';
     errDiv.style.display = 'block';
   } else if (error === 'password_mismatch') {
     errDiv.textContent = 'Passwords do not match. Please try again.';
@@ -89,7 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const slider = document.getElementById('authSlider');
   if (!slider) return;
 
-  // Check if we arrived from another auth page
   const slideFrom = sessionStorage.getItem('slideFrom');
   if (slideFrom === 'login') {
     slider.style.transition = 'none';
@@ -112,7 +128,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   sessionStorage.removeItem('slideFrom');
 
-  // Intercept navigation to other auth pages
   document.querySelectorAll('a').forEach(link => {
     link.addEventListener('click', e => {
       const href = link.getAttribute('href');
@@ -124,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('slideFrom', 'register');
         slider.style.transition = 'transform 0.4s ease-in-out';
         slider.style.transform = `translateX(-${targetPos * 100}%)`;
-        setTimeout(() => window.location.href = link.href, 400); // Wait for animation to finish
+        setTimeout(() => window.location.href = link.href, 400);
       }
     });
   });

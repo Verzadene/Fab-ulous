@@ -12,9 +12,9 @@ $confirmPassword = $_POST['confirmPassword'] ?? '';
 
 // Password strength validation
 if (
-    strlen($password) < 16
-    || preg_match_all('/[^a-zA-Z0-9]/', $password) < 2
-    || preg_match_all('/[0-9]/', $password) < 2
+    strlen($password) < 8
+    || preg_match_all('/[^a-zA-Z0-9]/', $password) < 1
+    || preg_match_all('/[0-9]/', $password) < 1
 ) {
     header('Location: ../register/register.html?error=weak_password');
     exit;
