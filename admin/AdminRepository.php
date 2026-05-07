@@ -325,7 +325,7 @@ class AdminRepository {
             return "Failed to delete account.";
         }
 
-        $del->bind_param("i", $targetID);
+        $del->bind_param("i", $targetID); 
         $deleted = $del->execute();
         $del->close();
 
