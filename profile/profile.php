@@ -130,7 +130,7 @@ $myAvatarUrl = get_current_user_avatar();
                          autocomplete="new-password"/>
                 </div>
               </div>
-              <p class="pass-requirements">Minimum 16 characters &middot; at least 2 special characters &middot; at least 2 numbers</p>
+              <p class="pass-requirements">Minimum 8 characters &middot; at least 1 special character &middot; at least 1 number</p>
             </div>
 
             <!-- Actions -->
@@ -266,7 +266,7 @@ $myAvatarUrl = get_current_user_avatar();
           }
 
           document.getElementById('currentPassWrap').style.display = d.has_password ? 'block' : 'none';
-          document.getElementById('new_password').placeholder = d.has_password ? 'Leave blank to keep current' : 'Min 16 chars';
+          document.getElementById('new_password').placeholder = d.has_password ? 'Leave blank to keep current' : 'Min 8 chars';
         }
       } catch (err) {
         console.error('Failed to load profile', err);

@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($newPassword)) {
         if ($newPassword !== $confirmPassword) {
             $errors[] = 'New passwords do not match.';
-        } elseif (strlen($newPassword) < 16 || preg_match_all('/[^a-zA-Z0-9]/', $newPassword) < 2 || preg_match_all('/[0-9]/', $newPassword) < 2) {
-            $errors[] = 'Password must be at least 16 characters with 2+ special characters and 2+ numbers.';
+        } elseif (strlen($newPassword) < 8 || preg_match_all('/[^a-zA-Z0-9]/', $newPassword) < 1 || preg_match_all('/[0-9]/', $newPassword) < 1) {
+            $errors[] = 'Password must be at least 8 characters with at least 1 special character and 1 number.';
         } else {
             $currentPassword = $_POST['current_password'] ?? null;
             $passwordResult = $repo->updatePassword($userId, $currentPassword, $newPassword);
