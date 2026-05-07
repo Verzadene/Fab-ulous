@@ -38,12 +38,24 @@ defined('PAYMONGO_WEBHOOK_SECRET') || define(
 defined('PAYMONGO_API_BASE') || define('PAYMONGO_API_BASE', getenv('PAYMONGO_API_BASE') ?: 'https://api.paymongo.com/v1');
 defined('PAYMONGO_PAYMENT_METHOD_TYPES') || define('PAYMONGO_PAYMENT_METHOD_TYPES', getenv('PAYMONGO_PAYMENT_METHOD_TYPES') ?: 'card,gcash');
 
-// Database
-defined('DB_HOST') || define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-defined('DB_USER') || define('DB_USER', getenv('DB_USER') ?: 'root');
-defined('DB_PASS') || define('DB_PASS', getenv('DB_PASS') ?: '');
-defined('DB_NAME') || define('DB_NAME', getenv('DB_NAME') ?: 'fab_ulous');
-defined('DB_PORT') || define('DB_PORT', (int) (getenv('DB_PORT') ?: 3306));
+// Database configuration for micro-databases
+defined('DB_CONFIG') || define('DB_CONFIG', [
+    'accounts'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_accounts', 'port' => 3306],
+    'posts'                 => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_posts', 'port' => 3306],
+    'likes'                 => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_likes', 'port' => 3306],
+    'comments'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_comments', 'port' => 3306],
+    'commissions'           => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_commissions', 'port' => 3306],
+    'commission_payments'   => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_commission_payments', 'port' => 3306],
+    'friendships'           => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_friendships', 'port' => 3306],
+    'notifications'         => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_notifications', 'port' => 3306],
+    'messages'              => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_messages', 'port' => 3306],
+    'pending_registrations' => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_pending_registrations', 'port' => 3306],
+    'password_resets'       => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_password_resets', 'port' => 3306],
+    'audit_log'             => ['host' => 'localhost', 'user' => 'root', 'pass' => '', 'name' => 'fab_ulous_audit_log', 'port' => 3306],
+]);
+
+// Global array to hold active database connections to avoid reconnecting
+$GLOBALS['db_connections'] = [];
 
 // SMTP / email
 defined('SMTP_HOST') || define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com');
@@ -61,17 +73,43 @@ defined('MFA_RESEND_COOLDOWN_SECONDS') || define('MFA_RESEND_COOLDOWN_SECONDS', 
 $GLOBALS['FABULOUS_LAST_MAIL_ERROR'] = '';
 
 /**
- * Returns an open MySQLi connection.
- * Caller is responsible for closing it.
+ * Returns an open MySQLi connection for a specific database domain.
+ * Connections are cached for reuse within the same request.
+ * Caller is responsible for closing connections at the end of the request (e.g., via register_shutdown_function).
+ *
+ * @param string $domain The logical name of the database (e.g., 'accounts', 'posts').
+ * @return mysqli An open mysqli connection.
+ * @throws Exception If the database domain is not configured or connection fails.
  */
-function db_connect(): mysqli
+function db_connect(string $domain): mysqli
 {
-    $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
+    global $db_connections;
+
+    if (isset($db_connections[$domain]) && $db_connections[$domain]->ping()) {
+        return $db_connections[$domain];
+    }
+
+    $config = DB_CONFIG[$domain] ?? null;
+    if ($config === null) {
+        http_response_code(500);
+        die("Database configuration for domain '{$domain}' not found.");
+    }
+
+    $conn = new mysqli(
+        $config['host'],
+        $config['user'],
+        $config['pass'],
+        $config['name'],
+        $config['port']
+    );
+
     if ($conn->connect_error) {
         http_response_code(500);
-        die('Database connection failed.');
+        die("Database connection to '{$domain}' failed: " . $conn->connect_error);
     }
     $conn->set_charset('utf8mb4');
+
+    $db_connections[$domain] = $conn;
     return $conn;
 }
 
@@ -82,67 +120,15 @@ function dashboard_path_for_role(string $role): string
         : '../post/post.php';
 }
 
-function begin_user_session(array $user, bool $mfaVerified = true, string $authMethod = 'password'): void
-{
-    session_regenerate_id(true);
-
-    $_SESSION['user'] = [
-        'id' => (int) $user['id'],
-        'username' => $user['username'],
-        'email' => $user['email'],
-        'name' => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
-        'role' => $user['role'] ?? 'user',
-        'google_id' => $user['google_id'] ?? null,
-        'profile_pic' => $user['profile_pic'] ?? null,
-        'auth_method' => $authMethod,
-    ];
-    $_SESSION['mfa_verified'] = $mfaVerified;
-    unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
-}
-
-function clear_pending_auth(): void
-{
-    unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
-}
-
-function get_current_user_avatar(): ?string
-{
-    if (empty($_SESSION['user']['id'])) {
-        return null;
-    }
-
-    $pic = $_SESSION['user']['profile_pic'] ?? null;
-
-    // If session doesn't have it (e.g. stale login session), fetch from DB once to sync session.
-    if ($pic === null && empty($_SESSION['user']['profile_pic_synced'])) {
-        $conn = db_connect();
-        $colCheck = $conn->query("SHOW COLUMNS FROM accounts LIKE 'profile_pic'");
-        if ($colCheck && $colCheck->num_rows > 0) {
-            $stmt = $conn->prepare("SELECT profile_pic FROM accounts WHERE id = ?");
-            if ($stmt) {
-                $uid = (int) $_SESSION['user']['id'];
-                $stmt->bind_param("i", $uid);
-                $stmt->execute();
-                $row = $stmt->get_result()->fetch_assoc();
-                if ($row && !empty($row['profile_pic'])) {
-                    $pic = $row['profile_pic'];
-                    $_SESSION['user']['profile_pic'] = $pic;
-                }
-                $stmt->close();
-            }
+// Register a shutdown function to close all active database connections
+register_shutdown_function(function() {
+    global $db_connections;
+    foreach ($db_connections as $conn) {
+        if ($conn instanceof mysqli && !$conn->connect_error) {
+            $conn->close();
         }
-        $conn->close();
-        $_SESSION['user']['profile_pic_synced'] = true;
     }
-
-    if ($pic) {
-        $avatarPath = __DIR__ . '/uploads/profile_pics/' . $pic;
-        $v = file_exists($avatarPath) ? filemtime($avatarPath) : time();
-        return '../uploads/profile_pics/' . rawurlencode($pic) . '?v=' . $v;
-    }
-
-    return null;
-}
+});
 
 function login_lockout_remaining(string $bucket): int
 {
@@ -180,18 +166,80 @@ function clear_login_lockout(string $bucket): void
     unset($_SESSION[$bucket . '_attempts'], $_SESSION[$bucket . '_lockout_until']);
 }
 
-function notification_type_supported(mysqli $conn, string $type): bool
+function begin_user_session(array $user, bool $mfaVerified = true, string $authMethod = 'password'): void
+{
+    session_regenerate_id(true);
+
+    $_SESSION['user'] = [
+        'id' => (int) $user['id'],
+        'username' => $user['username'],
+        'email' => $user['email'],
+        'name' => trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? '')),
+        'role' => $user['role'] ?? 'user',
+        'google_id' => $user['google_id'] ?? null,
+        'profile_pic' => $user['profile_pic'] ?? null,
+        'auth_method' => $authMethod,
+    ];
+    $_SESSION['mfa_verified'] = $mfaVerified;
+    unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
+}
+
+function clear_pending_auth(): void
+{
+    unset($_SESSION['pending_mfa_user'], $_SESSION['pending_mfa_sent_at']);
+}
+
+function get_current_user_avatar(): ?string
+{
+    if (empty($_SESSION['user']['id'])) {
+        return null;
+    }
+
+    $pic = $_SESSION['user']['profile_pic'] ?? null;
+
+    // If session doesn't have it (e.g. stale login session), fetch from DB once to sync session.
+    if ($pic === null && empty($_SESSION['user']['profile_pic_synced'])) {
+        $conn = db_connect('accounts');
+        $colCheck = $conn->query("SHOW COLUMNS FROM accounts LIKE 'profile_pic'");
+        if ($colCheck && $colCheck->num_rows > 0) {
+            $stmt = $conn->prepare("SELECT profile_pic FROM accounts WHERE id = ?");
+            if ($stmt) {
+                $uid = (int) $_SESSION['user']['id'];
+                $stmt->bind_param("i", $uid);
+                $stmt->execute();
+                $row = $stmt->get_result()->fetch_assoc();
+                if ($row && !empty($row['profile_pic'])) {
+                    $pic = $row['profile_pic'];
+                    $_SESSION['user']['profile_pic'] = $pic;
+                }
+                $stmt->close();
+            }
+        }
+        $_SESSION['user']['profile_pic_synced'] = true;
+    }
+
+    if ($pic) {
+        $avatarPath = __DIR__ . '/uploads/profile_pics/' . $pic;
+        $v = file_exists($avatarPath) ? filemtime($avatarPath) : time();
+        return '../uploads/profile_pics/' . rawurlencode($pic) . '?v=' . $v;
+    }
+
+    return null;
+}
+
+function notification_type_supported(string $type): bool
 {
     static $supportedTypes = null;
 
     if ($supportedTypes === null) {
         $supportedTypes = [];
-        $tableCheck = $conn->query("SHOW TABLES LIKE 'notifications'");
-        if (!$tableCheck || $tableCheck->num_rows === 0) {
+        $connNotifications = db_connect('notifications'); // Connect to the specific notifications DB
+        $tableCheck = $connNotifications->query("SHOW TABLES LIKE 'notifications'"); // Check if table exists in the current DB context
+        if (!$tableCheck || $tableCheck->num_rows === 0) { // Check if table exists in the current DB context
             return false;
         }
 
-        $columnCheck = $conn->query("SHOW COLUMNS FROM notifications LIKE 'type'");
+        $columnCheck = $connNotifications->query("SHOW COLUMNS FROM notifications LIKE 'type'");
         $column = $columnCheck ? $columnCheck->fetch_assoc() : null;
         $typeDefinition = $column['Type'] ?? '';
 
@@ -204,18 +252,19 @@ function notification_type_supported(mysqli $conn, string $type): bool
 }
 
 function create_notification(
-    mysqli $conn,
     int $recipientId,
     int $actorId,
     string $type,
     ?int $postId = null,
     ?int $refId = null
 ): bool {
-    if ($recipientId <= 0 || $actorId <= 0 || !notification_type_supported($conn, $type)) {
+    $connNotifications = db_connect('notifications');
+
+    if ($recipientId <= 0 || $actorId <= 0 || !notification_type_supported($type)) {
         return false;
     }
 
-    $stmt = $conn->prepare(
+    $stmt = $connNotifications->prepare(
         "INSERT INTO notifications (userID, actor_id, type, post_id, ref_id, is_read)
          VALUES (?, ?, ?, ?, ?, 0)"
     );
@@ -252,20 +301,21 @@ function clear_google_registration_prefill(): void
     unset($_SESSION['google_registration_prefill']);
 }
 
-function accounts_support_mfa(mysqli $conn): bool
+function accounts_support_mfa(): bool // Removed $conn parameter
 {
     static $cached = null;
 
     if ($cached !== null) {
         return $cached;
     }
-
+    
+    $connAccounts = db_connect('accounts'); // Connect to the specific accounts DB
     $required = [
         'mfa_code' => false,
         'mfa_code_expires_at' => false,
     ];
 
-    $columns = $conn->query('SHOW COLUMNS FROM accounts');
+    $columns = $connAccounts->query('SHOW COLUMNS FROM accounts');
     if (!$columns) {
         $cached = false;
         return false;
@@ -281,9 +331,10 @@ function accounts_support_mfa(mysqli $conn): bool
     return $cached;
 }
 
-function store_mfa_code(mysqli $conn, int $userId, string $code): bool
+function store_mfa_code(int $userId, string $code): bool // Removed $conn parameter
 {
-    $stmt = $conn->prepare(
+    $connAccounts = db_connect('accounts'); // Connect to the specific accounts DB
+    $stmt = $connAccounts->prepare(
         'UPDATE accounts
          SET mfa_code = ?, mfa_code_expires_at = DATE_ADD(NOW(), INTERVAL ? MINUTE)
          WHERE id = ?'
@@ -299,9 +350,10 @@ function store_mfa_code(mysqli $conn, int $userId, string $code): bool
     return $ok;
 }
 
-function clear_mfa_code(mysqli $conn, int $userId): void
+function clear_mfa_code(int $userId): void // Removed $conn parameter
 {
-    $stmt = $conn->prepare(
+    $connAccounts = db_connect('accounts'); // Connect to the specific accounts DB
+    $stmt = $connAccounts->prepare(
         'UPDATE accounts
          SET mfa_code = NULL, mfa_code_expires_at = NULL
          WHERE id = ?'
