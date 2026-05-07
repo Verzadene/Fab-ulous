@@ -3,110 +3,139 @@
 ## Project Overview
 - Project: `FABulous`
 - Repository: `https://github.com/Verzadene/Fab-ulous`
-- Purpose: community platform for sharing software and hardware projects, with Google OAuth, email MFA, password reset by email, profile management, posts, messages, commissions, and admin tooling.
+- Purpose: Community platform for sharing software and hardware projects, with Google OAuth, email MFA, password reset by email, profile management, posts, messages, commissions, and admin tooling.
 
 ## Tech Stack
 - Backend: PHP 8.2 with `mysqli`
 - Frontend: HTML, CSS, JavaScript, Bootstrap 5.3
-- Database: MySQL via XAMPP
+- Database: **12 separate MySQL databases** (micro-database architecture) via XAMPP. Foreign key constraints are NOT enforced at the DB level — all referential integrity and cascading deletes are handled in PHP.
 - Auth: username/email login, Google OAuth 2.0, email MFA
 
 ## Local Run Notes
 - App root: `C:\xampp\htdocs\Fab-ulous`
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
-- Main database setup: `database/setup.sql`
-- Existing schema updates: `database/migration_v3_mfa.sql`, `database/migration_v4.sql`, `database/migration_v5.sql`, `database/migration_v6_paymongo.sql`, `database/migration_v7_notifications.sql`, `database/migration_v8_profile_fields.sql`
-- Password reset depends on the `password_resets` table from `database/migration_v5.sql`
-- PayMongo commission payments depend on the `commission_payments` table from `database/migration_v6_paymongo.sql` and placeholder keys in `config.php` or `config.local.php`
-- Commission, payment, and message notifications depend on the expanded `notifications.type` enum from `database/migration_v7_notifications.sql`.
+- **Database setup:** Run `database/setup_micro_dbs.sql` to create all 12 databases. The old `setup.sql` and migration files are deprecated.
 - Forgot-password reset codes should only be created and emailed for existing `accounts.email` values.
-- Shared auth page spacing and helper/status styles live in `login/login.css`
+- Shared auth page spacing and helper/status styles live in `login/login.css`.
+
+---
 
 ## Instructions For Code Changes
-1. Read the full flow before editing. Authentication changes must check `login/`, `oauth/`, `register/`, `profile/`, and `config.php` together so redirects, sessions, and MFA stay aligned.
-2. Keep database access consistent. Use prepared statements, validate input on the server, and avoid inline SQL with interpolated user data.
-3. Preserve session behavior. Changes to login, logout, profile, MFA, or Google OAuth must not break `$_SESSION['user']`, `$_SESSION['mfa_verified']`, or pending verification state.
-4. Treat Google OAuth as sign-in for existing accounts only unless product requirements change. If a Google email is missing from `accounts`, show a clear register-first message instead of silently creating a login session.
-5. When adding account fields, ship both pieces:
-   update `database/setup.sql` for fresh installs
-   add a new migration in `database/` for existing databases
-6. Keep typography and design tokens consistent across pages. Use `Josefin Sans, sans-serif` for display text and `Inter, sans-serif` for body text wherever the page defines font variables.
-7. Preserve the current visual language. Reuse the existing green palette, rounded controls, and responsive layout patterns unless a page redesign is explicitly requested.
-8. For uploads, validate MIME type and file size, make sure target folders exist and are writable, and account for browser caching when the same filename is reused.
-9. Avoid breaking XAMPP-friendly paths. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...` unless environment config is being updated intentionally.
-10. If a feature depends on a schema migration or config change, surface that clearly in the UI or docs instead of failing silently.
-11. Password reset emails should go through `send_password_reset_email()` in `config.php` so send failures can be surfaced consistently.
-12. **Repository Pattern:** Phase 0 of the architecture migration is complete. Endpoint scripts (`.php`) should act as thin HTTP controllers. Place all database queries and multi-step business logic (e.g., executing an action *and* firing a notification) into composite methods inside the corresponding `*Repository.php` classes.
-13. **Account Deletion:** Super admins can delete any user account (except other super admins). Regular admins can delete regular users only. Deletion requires a reason/description which is sent to the user via email before account removal. The deletion action is logged in the audit trail. Email send failures do not prevent deletion but are logged in the audit message.
+
+### 1. Multi-Database Architecture
+The application uses **12 separate MySQL databases** (one per domain). Because MySQL does not enforce foreign keys across databases:
+
+- All data integrity, referential constraints, and cascading deletes **must be handled in PHP**.
+- When deleting a user, `AdminRepository::processDeleteUser()` explicitly deletes their records from every relevant database in sequence.
+- No SQL `JOIN` can be written across databases in a normal prepared statement. Use one of two patterns:
+  - **(a) Fully-qualified names** — `db_name`.`table_name` in the SQL string (read-heavy queries where the cross-DB fetch happens in a single statement, e.g. `getFeed`, `getAllCommissions`).
+  - **(b) Application-level aggregation** — fetch IDs/data from DB-A first, then run a separate prepared statement against DB-B, merge in PHP (e.g. `getComments`, `getUnreadNotifications`, `getConversation`).
+
+### 2. Database Access & Configuration
+- `config.php` defines `DB_CONFIG` (a constant array of all 12 database credentials) and the `db_connect(string $domain): mysqli` function.
+- `config.local.php` **must define `DB_CONFIG` before `config.php`** (it is loaded first via `require_once` at the top of `config.php`). Because PHP constants cannot be redefined, the local file must provide the complete `DB_CONFIG` array — individual `DB_NAME_*` constants are informational only.
+- To get a connection: `db_connect('domain_name')` — e.g. `db_connect('posts')`, `db_connect('accounts')`.
+- Repository classes call `$this->getConnection('domain')` which internally calls the factory passed to their constructor.
+- All database queries **must use prepared statements**.
+
+### 3. Column Name Reference (post-migration)
+These columns were renamed during the monolith → micro-DB migration:
+
+| Table | Old name | New name |
+|---|---|---|
+| `friendships` | `requesterID` | `user1_id` |
+| `friendships` | `receiverID` | `user2_id` |
+| `messages` | `sender_id` | `senderID` |
+| `messages` | `receiver_id` | `receiverID` |
+| `comments` | `content` | `comment_text` |
+
+Always use the **new names** in new code. The canonical schema is in `database/setup_micro_dbs.sql`.
+
+**Migration script for upgrading an older `fab_ulous_messages` database:** Databases created before the column-rename pass may still have `sender_id` / `receiver_id` in the `messages` table. Run `database/migration_messages_canonical.sql` to bring them up to canonical. The script is idempotent (uses `information_schema` checks before each `ALTER`) and safe to run on already-canonical databases. The friendships and comments DBs do not need a migration — they were always created with canonical names. `MessageRepository::getMessagesSchema()` has fallback logic for `message_text`/`content` and `created_at`/`timestamp`, but **no fallback for `senderID`/`receiverID`** — those must be canonical or the messaging UI fails with "Conversation unavailable".
+
+### 4. Repository Pattern
+Endpoint scripts (`.php` controllers) should be thin HTTP controllers. Place all:
+- Database queries
+- Multi-step business logic (e.g. save a record AND fire a notification)
+- Cascading deletes
+
+…inside the relevant `*Repository.php` class.
+
+### 5. Authentication & Session
+Read the full flow before editing. Authentication changes must keep `$_SESSION['user']`, `$_SESSION['mfa_verified']`, and pending-verification state consistent across `login/`, `oauth/`, `register/`, `profile/`, and `config.php`.
+
+### 6. Google OAuth
+Treat as sign-in for **existing accounts only**. If the Google email is not found in `accounts`, show a register-first message — never silently create a session.
+
+### 7. Account Deletion
+- Super admins can delete any user except other super admins.
+- Regular admins can delete regular users only.
+- Deletion requires a reason that is emailed to the user. Email failure does not block deletion but is logged in the audit trail.
+- `AdminRepository::processDeleteUser()` performs all cross-DB cascading deletes in sequence.
+
+### 8. UI/UX Consistency
+Keep typography (`Josefin Sans`, `Inter`) and design tokens (green palette, rounded controls) consistent. Preserve the current visual language and responsive layout patterns.
+
+### 9. Uploads & Paths
+Validate MIME type and file size. Ensure target folders exist. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...`.
+
+---
 
 ## Admin Features
 
 ### User Account Banning
 - **Location:** Admin Dashboard > User Management tab
-- **UI:** Ban button appears in the Actions column for eligible users (super admins can ban admins or users; regular admins can ban users only). Banned users show an Unban button instead.
-- **Modal:** Clicking Ban opens a Bootstrap modal styled like the Delete modal but with an orange accent (`#e67e22`). It includes:
-  - Warning banner with a ban (circle-slash) SVG icon and user details (username, email)
-  - Textarea for admin to enter a ban reason (1000 char limit; required before confirming)
-  - Character counter
-  - Cancel and "Ban Account" buttons
-  - A second `confirm()` dialog as a final safeguard before submission
-- **Implementation:**
-  - Modal HTML uses `.ban-warning`, `.ban-modal-header`, `.ban-modal-title`, `.ban-modal-confirm-btn` classes in `admin.css`
-  - `openBanUserModal()` and `confirmBanUser()` JS functions in `admin.php`
-  - `ban_reason` is POSTed alongside `action=ban_user` and `target_id`
-  - `processBanUser()` in `AdminRepository.php` accepts the optional `$banReason` string and appends it to the audit log entry
-- **Page refresh:** POSTing the ban form causes a full redirect (`header('Location: admin.php?msg=...')`) which refreshes the user list and updates the status column automatically
-- **Unban:** Opens a dedicated Bootstrap modal (`unbanUserModal`) with a green-accented confirmation panel showing the target user's username and email. No reason textarea is required. Clicking "Restore Access" shows a `confirm()` dialog before submitting. Uses `openUnbanUserModal()` and `confirmUnbanUser()` JS functions in `admin.php`. Modal uses `.unban-warning`, `.unban-modal-header`, `.unban-modal-title`, `.unban-modal-confirm-btn` classes in `admin.css`.
+- **UI:** Ban button (super admins can ban admins or users; regular admins can ban users only). Banned users show an Unban button instead.
+- **Modal:** Bootstrap modal with orange accent (`#e67e22`), ban reason textarea (1000 char limit, required), character counter, Cancel + "Ban Account" buttons, and a final `confirm()` dialog.
+- **Implementation:** `openBanUserModal()` / `confirmBanUser()` JS in `admin.php`; `processBanUser()` in `AdminRepository.php`.
+- **Unban:** Dedicated Bootstrap modal with green accent. Uses `openUnbanUserModal()` / `confirmUnbanUser()`.
 
-
+### Account Deletion
 - **Location:** Admin Dashboard > User Management tab
-- **UI:** Delete button appears in the Actions column for eligible users (only super admins can delete, or admins deleting regular users)
-- **Modal:** Clicking Delete opens a Bootstrap modal with:
-  - Warning banner with icon and user details (username, email)
-  - Textarea for admin to enter deletion reason (1000 char limit, required)
-  - Character counter
-  - Cancel and "Delete Account Permanently" buttons
-- **Implementation:** 
-  - Modal logic in `admin.php` with `openDeleteUserModal()` and `confirmDeleteUser()` JS functions
-  - `processDeleteUser()` method in `AdminRepository.php` handles email, deletion, and audit logging
-  - `send_account_deletion_email()` in `config.php` formats the dismissal email with reason
-  - Email includes deletion reason formatted clearly so user knows why account was removed
-- **Safeguards:** Cannot delete self, cannot delete super_admin accounts, admin role protection via role checks
-- **Email:** Sends via SMTP if configured; email failure is noted in audit log but does not block deletion
+- **UI:** Delete button for eligible users only.
+- **Modal:** Warning banner, deletion reason textarea (required), Cancel + "Delete Account Permanently" buttons.
+- **Implementation:** `openDeleteUserModal()` / `confirmDeleteUser()` JS in `admin.php`; `processDeleteUser()` in `AdminRepository.php`.
+- **Email:** `send_account_deletion_email()` in `config.php`.
+- **Safeguards:** Cannot delete self; cannot delete super_admin accounts.
+
+---
 
 ## UI Patterns
 
 ### Navigation & Help Button
-- The top navigation bar (`includes/app_nav.php`) contains a **burger menu** (left-slide drawer) and a **Help button**.
-- The Help button triggers a **Bootstrap Offcanvas panel** (slides in from the right, `id="helpOffcanvas"`).
-- The offcanvas explains the five main burger menu items: Commissions, Share a Project or Update, Updates/Notifications, Community (from Friends), and Settings.
-- **Do not** revert the Help button to a plain anchor link (`<a href="README.md">`). Keep it as a `<button data-bs-toggle="offcanvas">`.
-- All Help button and offcanvas styles live at the bottom of `post/post.css` under the `/* ─── Help Button ─── */` and `/* ─── Help Offcanvas ─── */` comment blocks. Since every authenticated page imports `post.css`, these styles are globally available.
-- The offcanvas uses the same green palette and `Josefin Sans` / `Inter` font pairing as the rest of the app. Preserve these tokens if editing the Help panel.
+- Top nav (`includes/app_nav.php`): burger menu (left-slide drawer) + Help button.
+- Help button triggers a Bootstrap Offcanvas panel (`id="helpOffcanvas"`) sliding in from the right.
+- **Do not** revert the Help button to a plain `<a href="README.md">`. Keep it as `<button data-bs-toggle="offcanvas">`.
+- All Help / offcanvas styles live at the bottom of `post/post.css` (globally imported by every authenticated page).
+
+---
 
 ## Verification Checklist
 1. Run `php -l` on every edited PHP file.
 2. Re-test the affected route in the browser after each auth or upload change.
 3. For CSS updates, check both desktop and mobile widths.
-4. For database-related updates, verify behavior against both a fresh setup and a migrated setup when possible.
-5. For password reset changes, verify both the success path and the SMTP failure path so the UI does not falsely claim the code was sent.
+4. For database-related updates, verify behaviour against both a fresh setup and a migrated setup.
+5. For password reset changes, verify both the success path and the SMTP failure path.
+6. When adding a new cross-domain query, confirm it uses either fully-qualified names *or* application-level aggregation — never a direct JOIN on plain table names across connections.
 
-## Recommended Optional Project Files
-- `CLAUDE.local.md`: personal, untracked preferences or reminders
-- `mcp.json`: shared integrations such as GitHub or project tooling
-- `.claude/rules/`: modular coding, testing, and API rules
-- `.claude/commands/`: repeatable slash-command workflows
-- `.claude/skills/`: task-specific auto-loaded procedures
-- `.claude/agents/`: specialized helper agent instructions
-- `.claude/hooks/`: validation or safety scripts
+---
 
 ## Current Repo-Specific Guardrails
-- Do not remove MFA behavior when changing login logic.
+- Do not remove MFA behaviour when changing login logic.
 - Do not auto-link or auto-create accounts for unknown Google emails without an explicit requirement.
 - Do not introduce new fonts or CSS tokens when existing page variables already cover the need.
 - Do not rely on client-side validation alone for passwords, uploads, or account updates.
-- Do not silently swallow password reset email failures; keep the error visible to the user.
+- Do not silently swallow password reset email failures.
 - Do not redirect unknown emails into the reset-password flow as though a reset code was sent.
-- Keep uploaded user content out of git; `/uploads/` is ignored because local profile, post, and commission files differ between machines.
-- Feed posts from other accounts are friend-only; discovery and moderation surfaces must not leak non-friend posts into the user feed.
+- Keep uploaded user content out of git (`/uploads/` is gitignored).
+- Feed posts are friend-only; discovery and moderation surfaces must not leak non-friend posts into the user feed.
+- **Never use cross-database JOIN syntax in new queries.** Always use the qualified-name or app-level-aggregation pattern described in instruction #1 above.
+
+---
+
+## Recommended Optional Project Files
+- `CLAUDE.local.md` — personal, untracked preferences or reminders
+- `mcp.json` — shared integrations (GitHub, etc.)
+- `.claude/rules/` — modular coding, testing, and API rules
+- `.claude/commands/` — repeatable slash-command workflows
