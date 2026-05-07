@@ -8,7 +8,7 @@ if (!$pendingEmail) {
     exit;
 }
 
-$conn    = db_connect();
+$connPending = db_connect('pending_registrations');
 $error   = '';
 $success = '';
 
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "Please wait {$remaining} more seconds.";
         } else {
             $newCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-            $upd = $conn->prepare(
+            $upd = $connPending->prepare(
                 'UPDATE pending_registrations SET verify_code=?, code_expires_at=DATE_ADD(NOW(), INTERVAL 60 MINUTE), updated_at=NOW() WHERE email=?'
             );
             $upd->bind_param('ss', $newCode, $pendingEmail);
@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $upd->close();
 
             // Get display name from pending record
-            $nm = $conn->prepare('SELECT first_name, last_name FROM pending_registrations WHERE email=?');
+            $nm = $connPending->prepare('SELECT first_name, last_name FROM pending_registrations WHERE email=?');
             $nm->bind_param('s', $pendingEmail);
             $nm->execute();
             $row = $nm->get_result()->fetch_assoc();
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } else {
         $submitted = trim($_POST['verification_code'] ?? '');
-        $chk = $conn->prepare(
+        $chk = $connPending->prepare(
             'SELECT id, first_name, last_name, username, email, password_hash, google_id, verify_code, code_expires_at
              FROM pending_registrations WHERE email=? LIMIT 1'
         );
@@ -67,17 +67,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'That code has expired. Request a new one.';
         } else {
             // Insert verified account into accounts
-            $ins = $conn->prepare(
+            $connAccounts = db_connect('accounts');
+            $ins = $connAccounts->prepare(
                 'INSERT INTO accounts (first_name, last_name, username, email, password) VALUES (?, ?, ?, ?, ?)'
             );
             $ins->bind_param('sssss', $pending['first_name'], $pending['last_name'], $pending['username'], $pending['email'], $pending['password_hash']);
 
             if ($ins->execute()) {
-                $userId = $conn->insert_id;
+                $userId = $connAccounts->insert_id;
                 $ins->close();
 
                 // Remove pending record
-                $del = $conn->prepare('DELETE FROM pending_registrations WHERE email=?');
+                $del = $connPending->prepare('DELETE FROM pending_registrations WHERE email=?');
                 $del->bind_param('s', $pendingEmail);
                 $del->execute();
                 $del->close();
@@ -94,7 +95,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'google_id'  => null,
                 ], true, 'password');
 
-                $conn->close();
                 header('Location: ../post/post.php');
                 exit;
             } else {
@@ -107,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $maskedEmail  = mask_email_address($pendingEmail);
 $secondsLeft  = max(0, 60 - (time() - (int) ($_SESSION['pending_reg_sent_at'] ?? 0)));
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">

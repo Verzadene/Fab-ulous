@@ -7,8 +7,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$conn = db_connect();
-
 $password        = $_POST['password'] ?? '';
 $confirmPassword = $_POST['confirmPassword'] ?? '';
 
@@ -18,13 +16,11 @@ if (
     || preg_match_all('/[^a-zA-Z0-9]/', $password) < 2
     || preg_match_all('/[0-9]/', $password) < 2
 ) {
-    $conn->close();
     header('Location: ../register/register.html?error=weak_password');
     exit;
 }
 
 if ($password !== $confirmPassword) {
-    $conn->close();
     header('Location: ../register/register.html?error=password_mismatch');
     exit;
 }
@@ -35,14 +31,14 @@ $username  = trim($_POST['username']  ?? '');
 $email     = strtolower(trim($_POST['email'] ?? ''));
 
 // Check if email or username already exists in accounts
-$checkStmt = $conn->prepare('SELECT email, username FROM accounts WHERE email = ? OR username = ?');
+$connAccounts = db_connect('accounts');
+$checkStmt = $connAccounts->prepare('SELECT email, username FROM accounts WHERE email = ? OR username = ?');
 $checkStmt->bind_param('ss', $email, $username);
 $checkStmt->execute();
 $existing = $checkStmt->get_result()->fetch_assoc();
 $checkStmt->close();
 
 if ($existing) {
-    $conn->close();
     $errCode = ($existing['email'] === $email) ? 'email_taken' : 'username_taken';
     header("Location: ../register/register.html?error={$errCode}");
     exit;
@@ -60,14 +56,14 @@ if (!empty($prefill['google_id']) && !empty($prefill['email']) && strtolower($pr
 
 // Google OAuth registration: bypass email verification
 if ($googleId) {
-    $stmt = $conn->prepare(
+    $stmt = $connAccounts->prepare(
         'INSERT INTO accounts (first_name, last_name, username, email, password, google_id)
          VALUES (?, ?, ?, ?, ?, ?)'
     );
     $stmt->bind_param('ssssss', $firstName, $lastName, $username, $email, $hashedPassword, $googleId);
 
     if ($stmt->execute()) {
-        $userId = $conn->insert_id;
+        $userId = $connAccounts->insert_id;
         begin_user_session([
             'id'         => $userId,
             'username'   => $username,
@@ -79,25 +75,23 @@ if ($googleId) {
         ], true, 'google');
         clear_google_registration_prefill();
         $stmt->close();
-        $conn->close();
         header('Location: ../post/post.php');
         exit;
     }
 
     $errorMessage = $stmt->error;
     $stmt->close();
-    $conn->close();
     die('Registration failed: ' . $errorMessage);
 }
 
 // Regular email registration — check username uniqueness in pending_registrations too
-$pendingUserCheck = $conn->prepare('SELECT id FROM pending_registrations WHERE username = ? AND email != ?');
+$connPending = db_connect('pending_registrations');
+$pendingUserCheck = $connPending->prepare('SELECT id FROM pending_registrations WHERE username = ? AND email != ?');
 $pendingUserCheck->bind_param('ss', $username, $email);
 $pendingUserCheck->execute();
 $pendingUserCheck->store_result();
 if ($pendingUserCheck->num_rows > 0) {
     $pendingUserCheck->close();
-    $conn->close();
     header('Location: ../register/register.html?error=username_taken');
     exit;
 }
@@ -107,7 +101,7 @@ $pendingUserCheck->close();
 $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
 // Upsert into pending_registrations
-$stmt = $conn->prepare(
+$stmt = $connPending->prepare(
     'INSERT INTO pending_registrations (first_name, last_name, username, email, password_hash, verify_code, code_expires_at)
      VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 60 MINUTE))
      ON DUPLICATE KEY UPDATE
@@ -120,11 +114,9 @@ $stmt->bind_param('ssssss', $firstName, $lastName, $username, $email, $hashedPas
 if (!$stmt->execute()) {
     $errorMessage = $stmt->error;
     $stmt->close();
-    $conn->close();
     die('Pending registration failed: ' . $errorMessage);
 }
 $stmt->close();
-$conn->close();
 
 // Send verification email
 $displayName = trim($firstName . ' ' . $lastName);
