@@ -13,11 +13,11 @@ if (!$pendingUser) {
     exit;
 }
 
-$conn = db_connect();
+$connAccounts = db_connect('accounts');
 $error = '';
 $success = '';
 
-if (!accounts_support_mfa($conn)) {
+if (!accounts_support_mfa()) {
     $error = 'MFA database columns are missing. Run the SQL update before continuing.';
 }
 
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         } else {
             $code = (string) random_int(100000, 999999);
 
-            if (!store_mfa_code($conn, (int) $pendingUser['id'], $code)) {
+            if (!store_mfa_code((int) $pendingUser['id'], $code)) {
                 $error = 'We could not generate a new verification code. Please try again.';
             } else {
                 $_SESSION['pending_mfa_sent_at'] = time();
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 );
 
                 if (!$mailSent) {
-                    clear_mfa_code($conn, (int) $pendingUser['id']);
+                    clear_mfa_code((int) $pendingUser['id']);
                     $error = get_last_mail_error() ?: 'A new verification code could not be sent to your email address.';
                 } else {
                     $success = 'A new verification code has been sent.';
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         }
     } else {
         $submittedCode = trim($_POST['verification_code'] ?? '');
-        $stmt = $conn->prepare(
+        $stmt = $connAccounts->prepare(
             'SELECT id, first_name, last_name, username, email, role, google_id, profile_pic, mfa_code, mfa_code_expires_at
              FROM accounts
              WHERE id = ?
@@ -74,10 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         } elseif (empty($account['mfa_code_expires_at']) || strtotime($account['mfa_code_expires_at']) < time()) {
             $error = 'That verification code has expired. Request a new one.';
         } else {
-            clear_mfa_code($conn, (int) $account['id']);
+            clear_mfa_code((int) $account['id']);
             begin_user_session($account, true, 'password');
             header('Location: ' . dashboard_path_for_role($account['role'] ?? 'user'));
-            $conn->close();
             exit;
         }
     }
@@ -85,7 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
 
 $maskedEmail = mask_email_address($pendingUser['email']);
 $secondsLeft = max(0, MFA_RESEND_COOLDOWN_SECONDS - (time() - (int) ($_SESSION['pending_mfa_sent_at'] ?? 0)));
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -11,11 +11,6 @@ $step  = 1;
 $error = '';
 $success = '';
 
-$conn = db_connect();
-
-// Check password_resets table exists
-$tableExists = (bool) $conn->query("SHOW TABLES LIKE 'password_resets'")->num_rows;
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -25,7 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please enter a valid email address.';
         } else {
-            $accStmt = $conn->prepare("SELECT id, first_name FROM accounts WHERE email = ? LIMIT 1");
+            $connAccounts = db_connect('accounts');
+            $accStmt = $connAccounts->prepare("SELECT id, first_name FROM accounts WHERE email = ? LIMIT 1");
             $accStmt->bind_param('s', $email);
             $accStmt->execute();
             $account = $accStmt->get_result()->fetch_assoc();
@@ -34,16 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$account) {
                 unset($_SESSION['reset_email']);
                 $error = 'No FABulous account exists for that email address.';
-            } elseif (!$tableExists) {
-                $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
             } else {
-                $delStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+                $connPasswordResets = db_connect('password_resets');
+                $tableExists = (bool) $connPasswordResets->query("SHOW TABLES LIKE 'password_resets'")->num_rows;
+
+                if (!$tableExists) {
+                    $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
+                } else {
+                    $delStmt = $connPasswordResets->prepare("DELETE FROM password_resets WHERE email = ?");
                 $delStmt->bind_param('s', $email);
                 $delStmt->execute();
                 $delStmt->close();
 
                 $code = (string) random_int(100000, 999999);
-                $insStmt = $conn->prepare(
+                    $insStmt = $connPasswordResets->prepare(
                     "INSERT INTO password_resets (email, reset_code, expires_at)
                      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))"
                 );
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $mailSent = send_password_reset_email($email, $displayName, $code);
                     if (!$mailSent) {
-                        $cleanupStmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+                            $cleanupStmt = $connPasswordResets->prepare("DELETE FROM password_resets WHERE email = ?");
                         if ($cleanupStmt) {
                             $cleanupStmt->bind_param('s', $email);
                             $cleanupStmt->execute();
@@ -75,10 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $_SESSION['reset_email'] = $email;
                     }
                 }
+                }
             }
 
             if ($success) {
-                $conn->close();
                 header('Location: reset_password.php?sent=1');
                 exit;
             }
@@ -86,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -28,7 +28,7 @@ if (isset($_GET['google'])) {
     exit;
 }
 
-$conn = db_connect();
+$connAccounts = db_connect('accounts');
 $error = '';
 $errorIsHtml = false;
 
@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($lockoutRemaining > 0) {
         $error = '';
     } else {
-        $stmt = $conn->prepare("SELECT * FROM accounts WHERE username = ? OR email = ?");
+        $stmt = $connAccounts->prepare("SELECT * FROM accounts WHERE username = ? OR email = ?");
         $stmt->bind_param("ss", $usernameOrEmail, $usernameOrEmail);
         $stmt->execute();
         $user = $stmt->get_result()->fetch_assoc();
@@ -70,12 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } elseif ($user['banned']) {
                 $error = 'Your account has been suspended. Contact the administrator.';
             } else {
-                if (!accounts_support_mfa($conn)) {
+                if (!accounts_support_mfa()) {
                     $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
                 } else {
                     $code = (string) random_int(100000, 999999);
 
-                    if (!store_mfa_code($conn, (int) $user['id'], $code)) {
+                    if (!store_mfa_code((int) $user['id'], $code)) {
                         $error = 'We could not start MFA verification. Please try again.';
                     } else {
                         clear_login_lockout($lockoutBucket);
@@ -102,17 +102,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         if (!$mailSent) {
                             clear_pending_auth();
-                            clear_mfa_code($conn, (int) $user['id']);
+                            clear_mfa_code((int) $user['id']);
                             $error = get_last_mail_error() ?: 'A verification code could not be sent to your email address.';
                         } else {
                             header('Location: verify_mfa.php');
-                            $conn->close();
                             exit;
                         }
 
                         if (!$error) {
                             header('Location: verify_mfa.php');
-                            $conn->close();
                             exit;
                         }
                     }
@@ -126,7 +124,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-$conn->close();
 $lockoutRemaining = login_lockout_remaining($lockoutBucket);
 $isLocked = $lockoutRemaining > 0;
 ?>

@@ -11,9 +11,6 @@ $sent    = isset($_GET['sent']);
 $error   = '';
 $success = '';
 
-$conn = db_connect();
-$tableExists = (bool) $conn->query("SHOW TABLES LIKE 'password_resets'")->num_rows;
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action   = $_POST['action'] ?? '';
     $email    = strtolower(trim($_POST['email'] ?? ''));
@@ -24,16 +21,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'reset') {
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Please enter a valid email address.';
-        } elseif (!$tableExists) {
-            $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
         } elseif (strlen($code) !== 6 || !ctype_digit($code)) {
             $error = 'Enter the 6-digit code from your email.';
-        } elseif (strlen($newPass) < 8) {
-            $error = 'New password must be at least 8 characters.';
+        } elseif (strlen($newPass) < 16 || preg_match_all('/[^a-zA-Z0-9]/', $newPass) < 2 || preg_match_all('/[0-9]/', $newPass) < 2) {
+            $error = 'Password must be 16+ chars with 2+ special chars and 2+ numbers.';
         } elseif ($newPass !== $confirm) {
             $error = 'Passwords do not match.';
         } else {
-            $accountStmt = $conn->prepare("SELECT id FROM accounts WHERE email = ? LIMIT 1");
+            $connPasswordResets = db_connect('password_resets');
+            $tableExists = (bool) $connPasswordResets->query("SHOW TABLES LIKE 'password_resets'")->num_rows;
+            if (!$tableExists) {
+                $error = 'Password reset is not available yet. Run database/migration_v5.sql first.';
+            }
+
+            $connAccounts = db_connect('accounts');
+            $accountStmt = $connAccounts->prepare("SELECT id FROM accounts WHERE email = ? LIMIT 1");
             $accountStmt->bind_param('s', $email);
             $accountStmt->execute();
             $account = $accountStmt->get_result()->fetch_assoc();
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!$error) {
-            $tokenStmt = $conn->prepare(
+            $tokenStmt = $connPasswordResets->prepare(
                 "SELECT id FROM password_resets
                  WHERE email = ? AND reset_code = ? AND used = 0
                    AND expires_at > NOW()
@@ -61,18 +63,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hash = password_hash($newPass, PASSWORD_DEFAULT);
 
-                $updStmt = $conn->prepare("UPDATE accounts SET password = ? WHERE id = ?");
+                $updStmt = $connAccounts->prepare("UPDATE accounts SET password = ? WHERE id = ?");
                 $updStmt->bind_param('si', $hash, $account['id']);
                 $updStmt->execute();
                 $updStmt->close();
 
-                $markStmt = $conn->prepare("UPDATE password_resets SET used = 1 WHERE id = ?");
+                $markStmt = $connPasswordResets->prepare("UPDATE password_resets SET used = 1 WHERE id = ?");
                 $markStmt->bind_param('i', $tokenRow['id']);
                 $markStmt->execute();
                 $markStmt->close();
 
                 unset($_SESSION['reset_email']);
-                $conn->close();
                 header('Location: login.php?reset=1');
                 exit;
             }
@@ -80,7 +81,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -142,7 +142,7 @@ $conn->close();
         </div>
         <div class="input-group">
           <input type="password" name="new_password" id="newPass" class="input-field"
-                 placeholder="New password (min 8 chars)"
+                 placeholder="New password (min 16 chars)"
                  autocomplete="new-password" required/>
         </div>
         <div class="input-group">
