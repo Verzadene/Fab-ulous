@@ -627,12 +627,34 @@ html, body {
   background: #c0392b;
 }
 
+/* ── Commission Table Polish ── */
+.commissions-table th {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comm-sn {
+  color: rgba(255,255,255,0.35);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  width: 42px;
+}
+
+.comm-count-row {
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.4);
+  padding: 0 2px;
+}
+
 /* ── Commission Form (inline in table) ── */
 .commission-form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  min-width: 180px;
+  gap: 5px;
+  min-width: 170px;
 }
 .commission-select {
   width: 100%;

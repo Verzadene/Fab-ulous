@@ -424,20 +424,21 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
         <table class="admin-table commissions-table" id="commTable">
           <thead>
             <tr>
-              <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
+              <th>S/N</th><th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
               <th>Amount</th><th>Status</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($commissions)): ?>
-              <tr class="empty-row"><td colspan="10" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+              <tr class="empty-row"><td colspan="11" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
             <?php else: ?>
-              <?php foreach ($commissions as $c): ?>
-                <?php 
+              <?php $commRowNum = 1; foreach ($commissions as $c): ?>
+                <?php
                   $searchString = htmlspecialchars(strtolower(($c['requester'] ?? '') . ' ' . ($c['title'] ?? '') . ' ' . ($c['description'] ?? '')));
                   $dateString = date('Y-m-d', strtotime($c['created_at']));
                 ?>
                 <tr data-search="<?php echo $searchString; ?>" data-date="<?php echo $dateString; ?>">
+                  <td class="comm-sn"><?php echo $commRowNum++; ?></td>
                   <td>#<?php echo $c['commissionID']; ?></td>
                   <td><?php echo htmlspecialchars($c['requester'] ?? '—'); ?></td>
                   <td>
@@ -491,6 +492,9 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
           </tbody>
         </table>
       </div>
+      <?php if (!empty($commissions)): ?>
+        <p class="comm-count-row" id="adminCommCount">Showing <strong><?php echo count($commissions); ?></strong> commissions</p>
+      <?php endif; ?>
     </div><!-- end tab-commissions -->
 
   </main>
