@@ -156,19 +156,22 @@ class CommissionRepository {
             );
             $stmt->execute();
         } else {
+            // The `c` alias is required because $paymentSubSelect references
+            // c.commissionID inside its cross-DB sub-selects (kept identical
+            // for the admin and user paths to avoid two divergent strings).
             $stmt = $connCommissions->prepare(
-                "SELECT commissionID,
+                "SELECT c.commissionID,
                         {$titleExpr} AS title,
-                        description,
-                        amount,
-                        status,
-                        created_at,
-                        {$noteCol},
-                        {$attachCol}
+                        c.description,
+                        c.amount,
+                        c.status,
+                        c.created_at,
+                        c.{$noteCol},
+                        c.{$attachCol}
                         {$paymentSubSelect}
-                 FROM commissions
-                 WHERE userID = ?
-                 ORDER BY created_at DESC"
+                 FROM commissions c
+                 WHERE c.userID = ?
+                 ORDER BY c.created_at DESC"
             );
             $stmt->bind_param('i', $userId);
             $stmt->execute();

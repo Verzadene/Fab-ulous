@@ -71,6 +71,12 @@ if ($repo->isCommissionPaid($commissionId)) {
     redirect_with_payment_error('This commission has already been paid.');
 }
 
+// If the user previously clicked Pay and abandoned the checkout, mark that
+// stale row as 'failed' before opening a fresh session. Keeps at most one
+// payable PayMongo session live per commission so the user cannot be
+// charged twice.
+$repo->supersedePendingPayments($commissionId);
+
 $payerName = trim((string)$commission['payer_name']);
 $payerEmail = (string)$commission['email'];
 $amountInCentavos = (int)round($amount * 100);

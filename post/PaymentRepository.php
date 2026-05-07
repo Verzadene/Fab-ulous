@@ -129,6 +129,27 @@ class PaymentRepository {
         return $ok;
     }
 
+    /**
+     * Marks every still-pending row for a commission as 'failed'. Called
+     * before opening a new checkout so a user who clicks Pay twice cannot
+     * end up with two simultaneously-payable PayMongo sessions for the
+     * same commission.
+     */
+    public function supersedePendingPayments(int $commissionId): int
+    {
+        $conn = $this->getConnection('commission_payments');
+        $stmt = $conn->prepare(
+            "UPDATE commission_payments SET status = 'failed'
+             WHERE commissionID = ? AND status = 'pending'"
+        );
+        if (!$stmt) return 0;
+        $stmt->bind_param('i', $commissionId);
+        $stmt->execute();
+        $affected = $stmt->affected_rows;
+        $stmt->close();
+        return $affected;
+    }
+
     public function updatePaymentWithCheckoutDetails(
         int $paymentId,
         string $checkoutId,
@@ -200,10 +221,42 @@ class PaymentRepository {
         $commissionId = (int)$row['commissionID'];
         if (($row['status'] ?? '') === 'paid') return 0;
 
+        // Refuse to mark this row paid if the commission is already paid via
+        // another session — guards against the user completing two parallel
+        // checkout sessions for the same commission.
+        if ($commissionId > 0) {
+            $dupStmt = $conn->prepare(
+                "SELECT 1 FROM commission_payments
+                 WHERE commissionID = ? AND status = 'paid' AND paymentID <> ?
+                 LIMIT 1"
+            );
+            if ($dupStmt) {
+                $dupStmt->bind_param('ii', $commissionId, $paymentId);
+                $dupStmt->execute();
+                $dupStmt->store_result();
+                $alreadyPaid = $dupStmt->num_rows > 0;
+                $dupStmt->close();
+                if ($alreadyPaid) {
+                    $failStmt = $conn->prepare(
+                        "UPDATE commission_payments SET status = 'failed'
+                         WHERE paymentID = ? AND status = 'pending'"
+                    );
+                    if ($failStmt) {
+                        $failStmt->bind_param('i', $paymentId);
+                        $failStmt->execute();
+                        $failStmt->close();
+                    }
+                    return 0;
+                }
+            }
+        }
+
+        // Only promote 'pending' rows. 'failed' / 'cancelled' rows must not
+        // become 'paid' through a stale webhook delivery.
         $stmt = $conn->prepare(
             "UPDATE commission_payments
              SET status = 'paid', paymongo_payment_id = ?, paid_at = NOW()
-             WHERE paymentID = ? AND status <> 'paid'"
+             WHERE paymentID = ? AND status = 'pending'"
         );
         if (!$stmt) return 0;
         $stmt->bind_param('si', $actualPaymentId, $paymentId);
