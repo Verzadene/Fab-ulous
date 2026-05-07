@@ -23,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Please enter a valid email address.';
         } elseif (strlen($code) !== 6 || !ctype_digit($code)) {
             $error = 'Enter the 6-digit code from your email.';
-        } elseif (strlen($newPass) < 16 || preg_match_all('/[^a-zA-Z0-9]/', $newPass) < 2 || preg_match_all('/[0-9]/', $newPass) < 2) {
-            $error = 'Password must be 16+ chars with 2+ special chars and 2+ numbers.';
+        } elseif (strlen($newPass) < 8 || preg_match_all('/[^a-zA-Z0-9]/', $newPass) < 1 || preg_match_all('/[0-9]/', $newPass) < 1) {
+            $error = 'Password must be 8+ chars with at least 1 special char and 1 number.';
         } elseif ($newPass !== $confirm) {
             $error = 'Passwords do not match.';
         } else {
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <div class="input-group">
           <input type="password" name="new_password" id="newPass" class="input-field"
-                 placeholder="New password (min 16 chars)"
+                 placeholder="New password (min 8 chars)"
                  autocomplete="new-password" required/>
         </div>
         <div class="input-group">
