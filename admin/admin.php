@@ -65,8 +65,13 @@ $revenueSales   = $metrics['revenueSales'];
 // ── Order Pipeline ───────────────────────────────────────────────
 $pipeline = $adminRepo->getOrderPipeline();
 
-// ── Live Audit Log (visibility-filtered) ────────────────────────
-$auditLogs = $adminRepo->getAuditLogs($isSuperAdmin);
+// ── Live Audit Log (visibility-filtered, searchable) ─────────────
+$auditSearch = trim($_GET['audit_search'] ?? '');
+$auditHours  = (int)($_GET['audit_hours'] ?? 8);
+if (!in_array($auditHours, [8, 24, 72, 168, 720], true)) {
+    $auditHours = 8;
+}
+$auditLogs = $adminRepo->searchAuditLogs($isSuperAdmin, $auditSearch, $auditHours);
 
 // ── User List ────────────────────────────────────────────────────
 $users = $adminRepo->getAllUsers();
@@ -159,17 +164,70 @@ $conn->close();
       <div class="bottom-row">
         <div class="audit-card">
           <h2 class="card-heading">Live Audit</h2>
-          <div class="audit-list">
+
+          <!-- ── Audit Filters ── -->
+          <div class="audit-filters">
+            <div class="audit-search-wrap">
+              <svg class="audit-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                id="auditSearchInput"
+                class="audit-search-input"
+                placeholder="Search by username or name…"
+                value="<?php echo htmlspecialchars($auditSearch); ?>"
+                oninput="filterAuditLog()"
+                autocomplete="off"
+              >
+              <button class="audit-search-clear" id="auditClearBtn" onclick="clearAuditSearch()" title="Clear search" aria-label="Clear search" style="display:<?php echo $auditSearch !== '' ? 'flex' : 'none'; ?>">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="audit-time-pills" role="group" aria-label="Time window">
+              <?php
+                $pills = [8 => '8 hrs', 24 => '24 hrs', 72 => '3 days', 168 => '7 days', 720 => '30 days'];
+                foreach ($pills as $h => $label):
+              ?>
+                <button
+                  type="button"
+                  class="audit-pill<?php echo $auditHours === $h ? ' active' : ''; ?>"
+                  data-hours="<?php echo $h; ?>"
+                  onclick="setAuditWindow(<?php echo $h; ?>, this)"
+                ><?php echo $label; ?></button>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <!-- ── Audit result count ── -->
+          <p class="audit-result-count" id="auditResultCount">
+            <?php
+              $cnt = count($auditLogs);
+              $windowLabel = $pills[$auditHours] ?? "{$auditHours} hrs";
+              echo $cnt === 0
+                ? 'No entries found.'
+                : "{$cnt} " . ($cnt === 1 ? 'entry' : 'entries') . " · last {$windowLabel}";
+            ?>
+          </p>
+
+          <div class="audit-list" id="auditList">
             <?php if (empty($auditLogs)): ?>
-              <p class="audit-empty">No admin actions recorded yet.</p>
+              <p class="audit-empty" id="auditEmpty">No admin actions in this period.</p>
             <?php else: ?>
-              <?php foreach ($auditLogs as $log): ?>
-                <div class="audit-entry">
-                  <span class="audit-admin"><?php echo htmlspecialchars($log['admin_username']); ?></span>:
+              <?php foreach ($auditLogs as $log):
+                $fullName = trim(($log['first_name'] ?? '') . ' ' . ($log['last_name'] ?? ''));
+                $searchData = strtolower($log['admin_username'] . ' ' . $fullName);
+              ?>
+                <div class="audit-entry" data-search="<?php echo htmlspecialchars($searchData); ?>">
+                  <span class="audit-admin"><?php echo htmlspecialchars($log['admin_username']); ?></span>
+                  <?php if ($fullName): ?>
+                    <span class="audit-fullname">(<?php echo htmlspecialchars($fullName); ?>)</span>
+                  <?php endif; ?>:
                   <?php echo htmlspecialchars($log['action']); ?>
                   <span class="audit-time"><?php echo date('M d, H:i', strtotime($log['created_at'])); ?></span>
                 </div>
               <?php endforeach; ?>
+              <p class="audit-empty" id="auditEmpty" style="display:none;">No entries match your search.</p>
             <?php endif; ?>
           </div>
         </div>
@@ -497,6 +555,61 @@ function filterFeed() {
 
 function filterCommissions() {
   applyFilters('commTable', 'filterCommText', 'filterCommStart', 'filterCommEnd');
+}
+
+// ── Audit Log Filter ─────────────────────────────────────────────
+function filterAuditLog() {
+  const input   = document.getElementById('auditSearchInput');
+  const text    = input ? input.value.toLowerCase().trim() : '';
+  const entries = document.querySelectorAll('#auditList .audit-entry');
+  const empty   = document.getElementById('auditEmpty');
+  const counter = document.getElementById('auditResultCount');
+  const clearBtn = document.getElementById('auditClearBtn');
+
+  if (clearBtn) clearBtn.style.display = text ? 'flex' : 'none';
+
+  let visible = 0;
+  entries.forEach(entry => {
+    const data = (entry.getAttribute('data-search') || '').toLowerCase();
+    const show = text === '' || data.includes(text);
+    entry.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  if (empty) empty.style.display = visible === 0 ? '' : 'none';
+  if (counter) {
+    const total = entries.length;
+    if (text === '') {
+      counter.textContent = total === 0
+        ? 'No entries found.'
+        : `${total} ${total === 1 ? 'entry' : 'entries'} · shown`;
+    } else {
+      counter.textContent = visible === 0
+        ? 'No entries match your search.'
+        : `${visible} of ${total} ${total === 1 ? 'entry' : 'entries'} match`;
+    }
+  }
+}
+
+function clearAuditSearch() {
+  const input = document.getElementById('auditSearchInput');
+  if (input) { input.value = ''; input.focus(); }
+  filterAuditLog();
+}
+
+function setAuditWindow(hours, btn) {
+  // Update pill active state immediately for snappy feel
+  document.querySelectorAll('.audit-pill').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  // Re-fetch by navigating; preserve any active search text
+  const search = (document.getElementById('auditSearchInput')?.value ?? '').trim();
+  const url = new URL(window.location.href);
+  url.searchParams.set('audit_hours', hours);
+  if (search) url.searchParams.set('audit_search', search);
+  else url.searchParams.delete('audit_search');
+  // Keep the page at the dashboard tab
+  window.location.href = url.toString();
 }
 
 function statusClassName(status) {

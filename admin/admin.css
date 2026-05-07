@@ -198,8 +198,120 @@ html, body {
 }
 .audit-entry:last-child { border-bottom: none; padding-bottom: 0; }
 .audit-admin { font-weight: 700; color: var(--green-active); }
+.audit-fullname { font-size: 12px; color: var(--text-muted); font-weight: 400; }
 .audit-time  { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .audit-empty { color: var(--text-muted); font-size: 14px; font-style: italic; }
+
+/* ── Audit Filters ── */
+.audit-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* Search input row */
+.audit-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.audit-search-icon {
+  position: absolute;
+  left: 11px;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.audit-search-input {
+  width: 100%;
+  padding: 8px 34px 8px 34px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-white);
+  outline: none;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.audit-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.audit-search-input:focus {
+  border-color: var(--green-accent);
+  background: rgba(255,255,255,0.08);
+}
+
+.audit-search-clear {
+  position: absolute;
+  right: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(255,255,255,0.10);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.audit-search-clear:hover {
+  background: rgba(255,255,255,0.20);
+  color: var(--text-white);
+}
+
+/* Time-window pill row */
+.audit-time-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.audit-pill {
+  padding: 4px 11px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.60);
+  cursor: pointer;
+  transition: background 0.16s, border-color 0.16s, color 0.16s;
+  white-space: nowrap;
+  line-height: 1.6;
+}
+
+.audit-pill:hover {
+  background: rgba(119,204,129,0.12);
+  border-color: rgba(119,204,129,0.35);
+  color: var(--green-active);
+}
+
+.audit-pill.active {
+  background: rgba(119,204,129,0.18);
+  border-color: var(--green-active);
+  color: var(--green-active);
+}
+
+/* Result count line */
+.audit-result-count {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 10px 1px;
+  min-height: 16px;
+}
 
 /* ── Pipeline Chart ── */
 .pipeline-card { display: flex; flex-direction: column; align-items: center; gap: 16px; }
@@ -650,6 +762,7 @@ html, body {
 /* Print — hide filters from printed output */
 @media print {
   .admin-filters { display: none !important; }
+  .audit-filters { display: none !important; }
 }
 /* ── Ban User Modal ── */
 .ban-modal-header {

@@ -53,6 +53,82 @@ class AdminRepository {
         return $auditLogs;
     }
 
+    /**
+     * Search audit logs by admin username or first+last name, within a rolling time window.
+     *
+     * @param bool   $isSuperAdmin  Whether the requesting admin sees super_admin-visibility entries.
+     * @param string $search        Free-text search: matched against admin_username, first_name, last_name (partial, case-insensitive).
+     * @param int    $hours         Rolling look-back window in hours (e.g. 8, 24, 72, 168, 720). 0 = no time limit.
+     * @param int    $limit         Max rows to return (default 200 to keep the view manageable).
+     * @return array<int,array{admin_username:string,first_name:string,last_name:string,action:string,created_at:string}>
+     */
+    public function searchAuditLogs(bool $isSuperAdmin, string $search = '', int $hours = 8, int $limit = 200): array {
+        $auditLogs = [];
+
+        // Build WHERE clauses
+        $conditions = [];
+        if (!$isSuperAdmin) {
+            $conditions[] = "al.visibility_role = 'admin'";
+        }
+        if ($hours > 0) {
+            $conditions[] = "al.created_at >= NOW() - INTERVAL ? HOUR";
+        }
+        $likeSearch = false;
+        if ($search !== '') {
+            $conditions[] = "(al.admin_username LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ? OR CONCAT(a.first_name,' ',a.last_name) LIKE ?)";
+            $likeSearch = true;
+        }
+
+        $where = $conditions ? ('WHERE ' . implode(' AND ', $conditions)) : '';
+
+        $sql = "SELECT al.admin_username, COALESCE(a.first_name,'') AS first_name,
+                       COALESCE(a.last_name,'') AS last_name, al.action, al.created_at
+                FROM audit_log al
+                LEFT JOIN accounts a ON a.id = al.admin_id
+                {$where}
+                ORDER BY al.created_at DESC
+                LIMIT ?";
+
+        $stmt = $this->conn->prepare($sql);
+        if (!$stmt) {
+            return $auditLogs;
+        }
+
+        // Build bind_param type string and values dynamically
+        $types = '';
+        $params = [];
+        if ($hours > 0) {
+            $types .= 'i';
+            $params[] = $hours;
+        }
+        if ($likeSearch) {
+            $like = '%' . $search . '%';
+            $types .= 'ssss';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $types .= 'i';
+        $params[] = $limit;
+
+        // Spread params into bind_param via reference array
+        $bindArgs = [&$types];
+        foreach ($params as &$p) {
+            $bindArgs[] = &$p;
+        }
+        unset($p);
+        call_user_func_array([$stmt, 'bind_param'], $bindArgs);
+
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($r = $result->fetch_assoc()) {
+            $auditLogs[] = $r;
+        }
+        $stmt->close();
+        return $auditLogs;
+    }
+
     public function getAllUsers(): array {
         $users = [];
         $uRes = $this->conn->query("SELECT id, first_name, last_name, username, email, role, banned, created_at FROM accounts ORDER BY created_at DESC");
