@@ -13,8 +13,7 @@ if (empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn    = db_connect();
-$commissionRepo = new CommissionRepository($conn);
+$commissionRepo = new CommissionRepository('db_connect');
 $userId  = (int) $_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
 $name    = $_SESSION['user']['name'];
@@ -47,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') 
     $data = $commissionRepo->getCommissionsWithStats($isAdmin, $userId);
     
     echo json_encode(array_merge(['success' => true], $data));
-    $conn->close();
     exit;
 }
 
@@ -61,7 +59,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAdmin && ($_POST['action'] ?? ''
 
     $result = $commissionRepo->processUpdateCommission($commissionId, $status, $adminNote, $amount, $userId, $username, $allowedStatuses);
 
-    $conn->close();
     echo json_encode($result);
     exit;
 }
@@ -75,12 +72,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
 
     $result = $commissionRepo->processSubmitCommission($userId, $title, $description, $file);
 
-    $conn->close();
     echo json_encode($result);
     exit;
 }
 
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">

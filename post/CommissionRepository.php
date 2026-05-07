@@ -1,14 +1,33 @@
 <?php
-
+/**
+ * CommissionRepository — all database logic for commissions and commission payments.
+ *
+ * Cross-database rule:
+ *   - Writes always target the already-selected database (plain table names).
+ *   - Cross-domain reads in getAllCommissions() use fully-qualified `db.table` references
+ *     because the query runs on the commissions connection but joins accounts data and
+ *     sub-selects from commission_payments.
+ */
 class CommissionRepository {
-    private mysqli $conn;
+    private $dbConnectFactory;
 
-    public function __construct(mysqli $conn) {
-        $this->conn = $conn;
+    public function __construct(callable $dbConnectFactory)
+    {
+        $this->dbConnectFactory = $dbConnectFactory;
     }
 
+    private function getConnection(string $domain): mysqli
+    {
+        return call_user_func($this->dbConnectFactory, $domain);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Single commission
+    // ──────────────────────────────────────────────────────────────────────────
+
     public function getCommissionById(int $commissionId): ?array {
-        $stmt = $this->conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
+        $conn = $this->getConnection('commissions');
+        $stmt = $conn->prepare('SELECT userID, status FROM commissions WHERE commissionID = ? LIMIT 1');
         if (!$stmt) return null;
         $stmt->bind_param('i', $commissionId);
         $stmt->execute();
@@ -18,7 +37,8 @@ class CommissionRepository {
     }
 
     public function updateCommission(int $commissionId, string $status, string $adminNote, float $amount): bool {
-        $stmt = $this->conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
+        $conn = $this->getConnection('commissions');
+        $stmt = $conn->prepare('UPDATE commissions SET status = ?, admin_note = ?, amount = ? WHERE commissionID = ?');
         if (!$stmt) return false;
         $stmt->bind_param('ssdi', $status, $adminNote, $amount, $commissionId);
         $ok = $stmt->execute();
@@ -26,8 +46,47 @@ class CommissionRepository {
         return $ok;
     }
 
+    public function createCommission(int $userId, string $title, string $description, ?string $attachUrl): ?int {
+        $conn = $this->getConnection('commissions');
+        $ins = $conn->prepare(
+            "INSERT INTO commissions (userID, commission_name, description, stl_file_url, status)
+             VALUES (?, ?, ?, ?, 'Pending')"
+        );
+        if (!$ins) return null;
+        $ins->bind_param('isss', $userId, $title, $description, $attachUrl);
+        $ok = $ins->execute();
+        $insertId = $ok ? (int)$conn->insert_id : null;
+        $ins->close();
+        return $insertId;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    public function getAdminIds(): array {
+        $conn = $this->getConnection('accounts');
+        $stmt = $conn->prepare("SELECT id FROM accounts WHERE role IN (?, ?) AND banned = 0");
+        if (!$stmt) {
+            error_log("CommissionRepository::getAdminIds prepare failed: " . $conn->error);
+            return [];
+        }
+        $r1 = 'admin';
+        $r2 = 'super_admin';
+        $stmt->bind_param('ss', $r1, $r2);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $ids = [];
+        while ($row = $result->fetch_assoc()) {
+            $ids[] = (int)$row['id'];
+        }
+        $stmt->close();
+        return $ids;
+    }
+
     public function logAuditAction(int $adminId, string $adminUsername, string $action, int $targetId): void {
-        $log = $this->conn->prepare(
+        $conn = $this->getConnection('audit_log');
+        $log  = $conn->prepare(
             "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
              VALUES (?, ?, ?, 'commission', ?, 'admin')"
         );
@@ -38,76 +97,83 @@ class CommissionRepository {
         }
     }
 
-    public function createCommission(int $userId, string $title, string $description, ?string $attachUrl): ?int {
-        $ins = $this->conn->prepare(
-            "INSERT INTO commissions (userID, commission_name, description, stl_file_url, status)
-             VALUES (?, ?, ?, ?, 'Pending')"
-        );
-        if (!$ins) return null;
-        $ins->bind_param('isss', $userId, $title, $description, $attachUrl);
-        $ok = $ins->execute();
-        $insertId = $ok ? (int) $this->conn->insert_id : null;
-        $ins->close();
-        return $insertId;
-    }
+    // ──────────────────────────────────────────────────────────────────────────
+    // Listing
+    // ──────────────────────────────────────────────────────────────────────────
 
-    public function getAdminIds(): array {
-        $admins = $this->conn->query("SELECT id FROM accounts WHERE role IN ('admin','super_admin') AND banned = 0");
-        $ids = [];
-        if ($admins) {
-            while ($admin = $admins->fetch_assoc()) {
-                $ids[] = (int) $admin['id'];
-            }
-        }
-        return $ids;
-    }
-
+    /**
+     * Returns all commissions (admin) or the current user's commissions (user).
+     *
+     * The admin query joins commissions → accounts and sub-selects from commission_payments.
+     * All three live in separate databases, so fully-qualified names are required.
+     */
     public function getAllCommissions(bool $isAdmin, int $userId): array {
+        $connCommissions = $this->getConnection('commissions');
+        $dbAccounts      = DB_CONFIG['accounts']['name'];
+        $dbPayments      = DB_CONFIG['commission_payments']['name'];
+
+        // Detect available columns (handles schema evolution)
         $commissionColumns = [];
-        $columnsResult = $this->conn->query('SHOW COLUMNS FROM commissions');
-        while ($columnsResult && $column = $columnsResult->fetch_assoc()) {
-            $commissionColumns[$column['Field']] = true;
+        $colResult = $connCommissions->query('SHOW COLUMNS FROM commissions');
+        while ($colResult && $col = $colResult->fetch_assoc()) {
+            $commissionColumns[$col['Field']] = true;
         }
 
-        $titleExprAdmin = isset($commissionColumns['commission_name'])
-            ? "COALESCE(NULLIF(c.commission_name, ''), c.description)"
-            : (isset($commissionColumns['title']) ? "COALESCE(NULLIF(c.title, ''), c.description)" : 'c.description');
-
-        $titleExprUser = isset($commissionColumns['commission_name'])
+        $titleExpr = isset($commissionColumns['commission_name'])
             ? "COALESCE(NULLIF(commission_name, ''), description)"
             : (isset($commissionColumns['title']) ? "COALESCE(NULLIF(title, ''), description)" : 'description');
 
-        $noteColAdmin = isset($commissionColumns['admin_note']) ? 'c.admin_note' : "'' AS admin_note";
-        $noteColUser  = isset($commissionColumns['admin_note']) ? 'admin_note'   : "'' AS admin_note";
-        $attachColAdmin = isset($commissionColumns['stl_file_url']) ? 'c.stl_file_url AS attachment_url' : "'' AS attachment_url";
-        $attachColUser  = isset($commissionColumns['stl_file_url']) ? 'stl_file_url AS attachment_url' : "'' AS attachment_url";
-        
-        $hasPaymentsTable = (bool) $this->conn->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
-        $paymentColsAdmin = $hasPaymentsTable
-            ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = c.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
-                 (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = c.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
-            : ", '' AS payment_status, NULL AS paid_at";
-        $paymentColsUser = $hasPaymentsTable
-            ? ", (SELECT cp.status FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
-                 (SELECT cp.paid_at FROM commission_payments cp WHERE cp.commissionID = commissions.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
+        $noteCol   = isset($commissionColumns['admin_note'])   ? 'admin_note'   : "'' AS admin_note";
+        $attachCol = isset($commissionColumns['stl_file_url']) ? 'stl_file_url AS attachment_url' : "'' AS attachment_url";
+
+        // Check payments table exists
+        $connPayments    = $this->getConnection('commission_payments');
+        $hasPaymentsTable = (bool)$connPayments->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
+
+        $paymentSubSelect = $hasPaymentsTable
+            ? ", (SELECT cp.status FROM `{$dbPayments}`.commission_payments cp WHERE cp.commissionID = c.commissionID ORDER BY cp.created_at DESC LIMIT 1) AS payment_status,
+                 (SELECT cp.paid_at FROM `{$dbPayments}`.commission_payments cp WHERE cp.commissionID = c.commissionID AND cp.status = 'paid' ORDER BY cp.paid_at DESC LIMIT 1) AS paid_at"
             : ", '' AS payment_status, NULL AS paid_at";
 
         if ($isAdmin) {
-            $stmt = $this->conn->prepare(
-                "SELECT c.commissionID, {$titleExprAdmin} AS title, c.description, c.amount, c.status, c.created_at, {$noteColAdmin}, {$attachColAdmin},
-                        a.username AS requester_username, CONCAT(a.first_name, ' ', a.last_name) AS requester_name, a.profile_pic AS requester_pic, a.email AS requester_email
-                        {$paymentColsAdmin}
-                 FROM commissions c JOIN accounts a ON c.userID = a.id ORDER BY c.created_at DESC"
+            $stmt = $connCommissions->prepare(
+                "SELECT c.commissionID,
+                        {$titleExpr} AS title,
+                        c.description,
+                        c.amount,
+                        c.status,
+                        c.created_at,
+                        c.{$noteCol},
+                        c.{$attachCol},
+                        a.username AS requester_username,
+                        CONCAT(a.first_name, ' ', a.last_name) AS requester_name,
+                        a.profile_pic AS requester_pic,
+                        a.email AS requester_email
+                        {$paymentSubSelect}
+                 FROM commissions c
+                 JOIN `{$dbAccounts}`.accounts a ON c.userID = a.id
+                 ORDER BY c.created_at DESC"
             );
             $stmt->execute();
         } else {
-            $stmt = $this->conn->prepare(
-                "SELECT commissionID, {$titleExprUser} AS title, description, amount, status, created_at, {$noteColUser}, {$attachColUser} {$paymentColsUser}
-                 FROM commissions WHERE userID = ? ORDER BY created_at DESC"
+            $stmt = $connCommissions->prepare(
+                "SELECT commissionID,
+                        {$titleExpr} AS title,
+                        description,
+                        amount,
+                        status,
+                        created_at,
+                        {$noteCol},
+                        {$attachCol}
+                        {$paymentSubSelect}
+                 FROM commissions
+                 WHERE userID = ?
+                 ORDER BY created_at DESC"
             );
             $stmt->bind_param('i', $userId);
             $stmt->execute();
         }
+
         $commissions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
         return $commissions;
@@ -115,18 +181,22 @@ class CommissionRepository {
 
     public function getCommissionsWithStats(bool $isAdmin, int $userId): array {
         $commissions = $this->getAllCommissions($isAdmin, $userId);
-        
+
         $stats = ['total' => count($commissions), 'pending' => 0, 'active' => 0, 'completed' => 0, 'spent' => 0.0];
         foreach ($commissions as $c) {
-            $stats['spent'] += (float) ($c['amount'] ?? 0);
+            $stats['spent'] += (float)($c['amount'] ?? 0);
             $s = $c['status'] ?? '';
-            if ($s === 'Pending')   $stats['pending']++;
-            elseif (in_array($s, ['Accepted','Ongoing','Delayed'], true)) $stats['active']++;
-            elseif ($s === 'Completed') $stats['completed']++;
+            if ($s === 'Pending')                                          $stats['pending']++;
+            elseif (in_array($s, ['Accepted', 'Ongoing', 'Delayed'], true)) $stats['active']++;
+            elseif ($s === 'Completed')                                    $stats['completed']++;
         }
-        
+
         return ['commissions' => $commissions, 'stats' => $stats];
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Process methods (used by endpoint controllers)
+    // ──────────────────────────────────────────────────────────────────────────
 
     public function processSubmitCommission(int $userId, string $title, string $description, ?array $file): array {
         $title       = mb_substr(trim($title), 0, 255);
@@ -138,7 +208,7 @@ class CommissionRepository {
         }
 
         if (!empty($file['name'])) {
-            $uploadErr = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+            $uploadErr = (int)($file['error'] ?? UPLOAD_ERR_OK);
 
             if ($uploadErr !== UPLOAD_ERR_OK) {
                 return ['success' => false, 'error' => 'File upload failed. Please try again.'];
@@ -146,7 +216,7 @@ class CommissionRepository {
                 return ['success' => false, 'error' => 'Attachment must be smaller than 10 MB.'];
             }
 
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $ext         = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             $allowedExts = ['pdf', 'stl'];
 
             if (!in_array($ext, $allowedExts, true)) {
@@ -161,8 +231,7 @@ class CommissionRepository {
             }
 
             $safeFilename = $userId . '_' . time() . '.' . $ext;
-            $destPath     = $uploadDir . $safeFilename;
-            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+            if (!move_uploaded_file($file['tmp_name'], $uploadDir . $safeFilename)) {
                 return ['success' => false, 'error' => 'Failed to save attachment.'];
             }
             $attachUrl = 'uploads/commissions/' . $safeFilename;
@@ -170,12 +239,6 @@ class CommissionRepository {
 
         $newId = $this->createCommission($userId, $title, $description, $attachUrl);
         if ($newId !== null) {
-            $adminIds = $this->getAdminIds();
-            foreach ($adminIds as $adminId) {
-                if ($adminId !== $userId) {
-                    create_notification($this->conn, $adminId, $userId, 'commission_submitted', null, $newId);
-                }
-            }
             return ['success' => true, 'message' => 'Commission request submitted successfully!'];
         }
 
@@ -191,19 +254,19 @@ class CommissionRepository {
             return ['success' => false, 'error' => 'Invalid data.'];
         }
 
-        $existing = $this->getCommissionById($commissionId);
-        $ownerId = $existing ? (int) ($existing['userID'] ?? 0) : 0;
-        $previousStatus = $existing ? (string) ($existing['status'] ?? '') : '';
+        $existing       = $this->getCommissionById($commissionId);
+        $ownerId        = $existing ? (int)($existing['userID'] ?? 0) : 0;
+        $previousStatus = $existing ? (string)($existing['status'] ?? '') : '';
 
         if ($this->updateCommission($commissionId, $status, $adminNote, $amount)) {
             if ($ownerId > 0 && $previousStatus !== $status) {
                 $notifType = $status === 'Accepted' ? 'commission_approved' : 'commission_updated';
-                create_notification($this->conn, $ownerId, $adminId, $notifType, null, $commissionId);
+                create_notification($ownerId, $adminId, $notifType, null, $commissionId);
             }
             $this->logAuditAction($adminId, $adminUsername, "Updated commission #{$commissionId} to {$status}", $commissionId);
             return ['success' => true, 'status' => $status, 'amount' => $amount, 'amount_formatted' => '₱' . number_format($amount, 2)];
         }
+
         return ['success' => false, 'error' => 'Update failed.'];
     }
 }
-?>

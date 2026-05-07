@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/PaymentRepository.php';
 
 if (empty($_SESSION['user'])) {
     header('Location: ../login/login.php');
@@ -45,85 +46,39 @@ if (!function_exists('curl_init')) {
 $commissionId = (int)($_POST['commission_id'] ?? 0);
 $userId = (int)$_SESSION['user']['id'];
 
+$repo = new PaymentRepository('db_connect');
+
 if (!$commissionId) {
     redirect_with_payment_error('Commission not found.');
 }
 
-$conn = db_connect();
-
-$hasPayments = (bool)$conn->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
-if (!$hasPayments) {
-    $conn->close();
+if (!$repo->checkPaymentsTableExists()) {
     redirect_with_payment_error('Payment table is missing. Run database/migration_v6_paymongo.sql.');
 }
 
-$commissionColumns = [];
-$columnsResult = $conn->query('SHOW COLUMNS FROM commissions');
-while ($columnsResult && $column = $columnsResult->fetch_assoc()) {
-    $commissionColumns[$column['Field']] = true;
-}
-$titleExpr = isset($commissionColumns['commission_name'])
-    ? "COALESCE(NULLIF(c.commission_name, ''), c.description)"
-    : (isset($commissionColumns['title'])
-        ? "COALESCE(NULLIF(c.title, ''), c.description)"
-        : 'c.description');
-
-$stmt = $conn->prepare(
-    "SELECT c.commissionID, c.amount, c.status,
-            {$titleExpr} AS title,
-            a.id AS userID, a.email, CONCAT(a.first_name, ' ', a.last_name) AS payer_name
-     FROM commissions c
-     JOIN accounts a ON a.id = c.userID
-     WHERE c.commissionID = ? AND c.userID = ?
-     LIMIT 1"
-);
-$stmt->bind_param('ii', $commissionId, $userId);
-$stmt->execute();
-$commission = $stmt->get_result()->fetch_assoc();
-$stmt->close();
+$commission = $repo->getCommissionForPayment($commissionId, $userId);
 
 if (!$commission) {
-    $conn->close();
     redirect_with_payment_error('You can only pay for your own commission.');
 }
 
 $amount = round((float)$commission['amount'], 2);
 if ($amount <= 0) {
-    $conn->close();
     redirect_with_payment_error('This commission does not have a payable amount yet.');
 }
 
-$paidCheck = $conn->prepare(
-    "SELECT paymentID FROM commission_payments
-     WHERE commissionID = ? AND userID = ? AND status = 'paid'
-     LIMIT 1"
-);
-$paidCheck->bind_param('ii', $commissionId, $userId);
-$paidCheck->execute();
-$paidCheck->store_result();
-if ($paidCheck->num_rows > 0) {
-    $paidCheck->close();
-    $conn->close();
+if ($repo->isCommissionPaid($commissionId)) {
     redirect_with_payment_error('This commission has already been paid.');
 }
-$paidCheck->close();
 
 $payerName = trim((string)$commission['payer_name']);
 $payerEmail = (string)$commission['email'];
 $amountInCentavos = (int)round($amount * 100);
 $title = mb_substr(trim((string)$commission['title']), 0, 120) ?: 'FABulous Commission';
 
-$ins = $conn->prepare(
-    "INSERT INTO commission_payments (commissionID, userID, payer_name, payer_email, amount, currency, status)
-     VALUES (?, ?, ?, ?, ?, 'PHP', 'pending')"
-);
-$ins->bind_param('iissd', $commissionId, $userId, $payerName, $payerEmail, $amount);
-$ok = $ins->execute();
-$paymentId = (int)$conn->insert_id;
-$ins->close();
+$paymentId = $repo->createPendingPaymentRecord($commissionId, $userId, $payerName, $payerEmail, $amount);
 
-if (!$ok || !$paymentId) {
-    $conn->close();
+if (!$paymentId) {
     redirect_with_payment_error('Could not prepare payment record.');
 }
 
@@ -187,23 +142,11 @@ $reference = $attributes['reference_number'] ?? null;
 
 if ($httpCode < 200 || $httpCode >= 300 || !$checkoutId || !$checkoutUrl) {
     $err = $response['errors'][0]['detail'] ?? $curlError ?: 'PayMongo checkout could not be created.';
-    $fail = $conn->prepare("UPDATE commission_payments SET status = 'failed' WHERE paymentID = ?");
-    $fail->bind_param('i', $paymentId);
-    $fail->execute();
-    $fail->close();
-    $conn->close();
+    $repo->failPaymentRecord($paymentId);
     redirect_with_payment_error($err);
 }
 
-$upd = $conn->prepare(
-    "UPDATE commission_payments
-     SET paymongo_checkout_id = ?, paymongo_reference = ?, checkout_url = ?
-     WHERE paymentID = ?"
-);
-$upd->bind_param('sssi', $checkoutId, $reference, $checkoutUrl, $paymentId);
-$upd->execute();
-$upd->close();
-$conn->close();
+$repo->updatePaymentWithCheckoutDetails($paymentId, $checkoutId, $reference, $checkoutUrl);
 
 header('Location: ' . $checkoutUrl);
 exit;

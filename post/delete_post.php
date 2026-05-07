@@ -24,12 +24,9 @@ if (!$postId) {
     exit;
 }
 
-$conn = db_connect();
-$repo = new PostRepository($conn);
+$repo = new PostRepository('db_connect');
 
 $ok = $repo->processDeletePost($postId, $userId, $actorUsername);
-
-$conn->close();
 
 if (!$ok) {
     echo json_encode(['success' => false, 'error' => 'Post not found or not yours.']);

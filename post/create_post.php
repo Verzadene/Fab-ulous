@@ -8,15 +8,12 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-
 $userID  = (int)$_SESSION['user']['id'];
 $caption = trim($_POST['caption'] ?? '');
 $image   = $_FILES['image'] ?? null;
 
-$repo = new PostRepository($conn);
+$repo = new PostRepository('db_connect');
 $repo->processCreatePost($userID, $caption, $image);
-$conn->close();
 
 header('Location: post.php');
 exit;

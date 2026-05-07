@@ -10,13 +10,11 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-$msgRepo = new MessageRepository($conn);
+$msgRepo = new MessageRepository('db_connect');
 $userId = (int) $_SESSION['user']['id'];
 
 $schema = $msgRepo->getMessagesSchema();
 if (!$schema['ready']) {
-    $conn->close();
     echo json_encode(['success' => false, 'error' => $schema['error'], 'unavailable' => true]);
     exit;
 }
@@ -26,13 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $friendId = (int) ($_GET['friend_id'] ?? 0);
 
     if ($action !== 'conversation' || !$friendId) {
-        $conn->close();
         echo json_encode(['success' => false, 'error' => 'Invalid request.']);
         exit;
     }
 
     $result = $msgRepo->processGetConversation($userId, $friendId, $schema);
-    $conn->close();
     
     echo json_encode($result);
     exit;
@@ -44,17 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $message = trim($_POST['message_text'] ?? '');
 
     if ($action !== 'send') {
-        $conn->close();
         echo json_encode(['success' => false, 'error' => 'Invalid request.']);
         exit;
     }
 
     $result = $msgRepo->processSendMessage($userId, $friendId, $message, $schema);
-    $conn->close();
     
     echo json_encode($result);
     exit;
 }
 
-$conn->close();
 echo json_encode(['success' => false, 'error' => 'Unsupported request method.']);

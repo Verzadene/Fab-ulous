@@ -9,8 +9,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-$repo = new FriendRepository($conn);
+$repo = new FriendRepository('db_connect');
 
 $myID  = (int)$_SESSION['user']['id'];
 $myUsername = $_SESSION['user']['username'];
@@ -20,14 +19,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $action = $_GET['action'] ?? '';
     if ($action === 'list') {
         $directory = $repo->getFriendDirectory($myID);
-        $conn->close();
         echo json_encode(['success' => true, 'directory' => $directory]);
         exit;
     }
 
     $targetID = (int)($_GET['user_id'] ?? 0);
     $result = $repo->processGetStatus($myID, $targetID);
-    $conn->close();
     echo json_encode($result);
     exit;
 }
@@ -40,7 +37,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'send') {
         $receiverID = (int)($_POST['receiver_id'] ?? 0);
         $result = $repo->processSendRequest($myID, $receiverID);
-        $conn->close();
         echo json_encode($result);
         exit;
     }
@@ -49,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'accept') {
         $friendshipID = (int)($_POST['friendship_id'] ?? 0);
         $result = $repo->processAcceptRequest($myID, $friendshipID);
-        $conn->close();
         echo json_encode($result);
         exit;
     }
@@ -58,12 +53,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'reject' || $action === 'cancel' || $action === 'remove') {
         $friendshipID = (int)($_POST['friendship_id'] ?? 0);
         $result = $repo->processRemoveFriendship($myID, $friendshipID);
-        $conn->close();
         echo json_encode($result);
         exit;
     }
 }
 
-$conn->close();
 echo json_encode(['success' => false, 'error' => 'Invalid request']);
 ?>

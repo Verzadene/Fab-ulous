@@ -24,11 +24,9 @@ if (!$postId || trim($caption) === '') {
     exit;
 }
 
-$conn = db_connect();
-$repo = new PostRepository($conn);
+$repo = new PostRepository('db_connect');
 
 $ok = $repo->processEditPost($postId, $userId, $caption);
-$conn->close();
 
 if (!$ok) {
     echo json_encode(['success' => false, 'error' => 'Post not found or not yours.']);

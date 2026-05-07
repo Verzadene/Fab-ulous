@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/InteractionRepository.php';
+require_once __DIR__ . '/PostRepository.php';
 header('Content-Type: application/json');
 
 if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
@@ -9,8 +9,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-$repo = new InteractionRepository($conn);
+$repo = new PostRepository('db_connect');
 
 $userID = (int)$_SESSION['user']['id'];
 
@@ -18,7 +17,6 @@ $userID = (int)$_SESSION['user']['id'];
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get') {
     $postID = (int)($_GET['post_id'] ?? 0);
     $comments = $repo->getComments($postID);
-    $conn->close();
     
     echo json_encode(['status' => 'success', 'data' => ['comments' => $comments]]);
     exit;
@@ -32,10 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $commentID = (int)($_POST['comment_id'] ?? 0);
         if (!$commentID) {
             echo json_encode(['status' => 'error', 'message' => 'Missing data']);
-            $conn->close(); exit;
+            exit;
         }
         $ok = $repo->deleteComment($commentID, $userID);
-        $conn->close();
         echo json_encode(['status' => $ok ? 'success' : 'error']);
         exit;
     }
@@ -45,11 +42,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $content = trim($_POST['content'] ?? '');
         if (!$commentID || empty($content)) {
             echo json_encode(['status' => 'error', 'message' => 'Missing data']);
-            $conn->close(); exit;
+            exit;
         }
         $content = mb_substr($content, 0, 500);
         $ok = $repo->editComment($commentID, $userID, $content);
-        $conn->close();
         echo json_encode(['status' => $ok ? 'success' : 'error']);
         exit;
     }
@@ -59,15 +55,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$postID || empty($content)) {
         echo json_encode(['status' => 'error', 'message' => 'Missing data']);
-        $conn->close();
         exit;
     }
 
     $content = mb_substr($content, 0, 500);
 
-    $ok = $repo->processAddComment($postID, $userID, $content);
+    $ok = $repo->addComment($postID, $userID, $content);
 
-    $conn->close();
     if ($ok) {
         echo json_encode(['status' => 'success', 'data' => []]);
     } else {
@@ -76,5 +70,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-echo json_encode(['status' => 'error', 'message' => 'Invalid request']);
 ?>

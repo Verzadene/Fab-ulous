@@ -9,8 +9,7 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
-$repo = new NotificationRepository($conn);
+$repo = new NotificationRepository('db_connect');
 
 $myID = (int)$_SESSION['user']['id'];
 
@@ -20,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     if ($action === 'count') {
         $count = $repo->getUnreadCount($myID);
-        $conn->close();
         echo json_encode(['success' => true, 'count' => $count]);
         exit;
     }
@@ -28,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     // Default: list unread notifications. Read items are hidden from the drawer
     // so the checkmark action visibly clears the current notification list.
     $rows = $repo->getUnreadNotifications($myID);
-    $conn->close();
 
     // Build human-readable messages
     foreach ($rows as &$r) {
@@ -82,12 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'mark_read') {
         $notifID = (int)($_POST['notif_id'] ?? 0);
         $repo->markAsRead($myID, $notifID);
-        $conn->close();
         echo json_encode(['success' => true]);
         exit;
     }
 }
 
-$conn->close();
 echo json_encode(['success' => false, 'error' => 'Invalid request']);
 ?>

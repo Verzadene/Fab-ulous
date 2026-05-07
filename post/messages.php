@@ -13,20 +13,21 @@ if (empty($_SESSION['mfa_verified'])) {
     exit;
 }
 
-$conn = db_connect();
 $userId = (int) $_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
 $name = $_SESSION['user']['name'];
 $role = $_SESSION['user']['role'] ?? 'user';
 $isAdmin = in_array($role, ['admin', 'super_admin'], true);
 
-$hasMessagesTable = (bool) $conn->query("SHOW TABLES LIKE 'messages'")->num_rows;
-$hasFriendships   = (bool) $conn->query("SHOW TABLES LIKE 'friendships'")->num_rows;
+$connMessages = db_connect('messages');
+$hasMessagesTable = (bool) $connMessages->query("SHOW TABLES LIKE 'messages'")->num_rows;
+$connFriendships = db_connect('friendships');
+$hasFriendships   = (bool) $connFriendships->query("SHOW TABLES LIKE 'friendships'")->num_rows;
 $selectedPersonId = (int) ($_GET['friend'] ?? 0);
 
 $myAvatarUrl = get_current_user_avatar();
 
-$msgRepo = new MessageRepository($conn);
+$msgRepo = new MessageRepository('db_connect');
 $contacts = $msgRepo->getContacts($userId, $hasFriendships);
 
 $selectedContact = null;
@@ -37,7 +38,6 @@ foreach ($contacts as $contact) {
     }
 }
 
-$conn->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -300,9 +300,12 @@ $conn->close();
         if (data.success) {
           messageInput.value = '';
           await loadConversation();
+        } else {
+          alert('Could not send message: ' + (data.error || 'An unknown error occurred.'));
         }
       } catch (error) {
         console.error('Message send failed.', error);
+        alert('Message send failed. Please check the console for details.');
       }
     }
 
