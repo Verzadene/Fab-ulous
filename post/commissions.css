@@ -1,5 +1,5 @@
 /* =============================================
-   COMMISSIONS.CSS — FABulous Premium UI
+   COMMISSIONS.CSS — FABulous
    ============================================= */
 
 .commissions-layout {
@@ -10,23 +10,38 @@
   padding: 20px;
 }
 
-/* ── Hero / Header ─────────────────────────── */
+/* ── Dashboard body override ─────────────────── */
+.commissions-dashboard {
+  background: #f3f7f4;
+  min-height: calc(100vh - var(--nav-height));
+  padding: 16px 12px 40px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Shared card base ────────────────────────── */
+.commission-hero,
+.commission-submit-card,
+.commission-table-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 20px rgba(0,0,0,0.04);
+  border: 1px solid #eef2ef;
+}
+
+/* ── Overview / Hero ─────────────────────────── */
 .commission-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: #fff;
-  border-radius: 18px;
-  padding: 28px 32px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  border: 1px solid #f0f3f1;
 }
 
 .commission-hero-copy .side-card-kicker {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   color: #5ea87a;
   margin-bottom: 6px;
@@ -35,20 +50,73 @@
 .commission-hero h1 {
   color: #0d1f16;
   font-family: var(--font);
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
+  line-height: 1.2;
 }
 
 .commission-hero p {
   color: #6b7c72;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.6;
   margin: 0;
-  max-width: 560px;
+  max-width: 520px;
 }
 
-/* ── Stats Row ─────────────────────────────── */
+/* Submit toggle button (hero action) */
+.comm-submit-toggle {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 22px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #1a3328;
+  color: #fff;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
+  white-space: nowrap;
+}
+
+.comm-submit-toggle:hover {
+  background: #2d5040;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(26,51,40,0.28);
+}
+
+.comm-submit-toggle.active {
+  background: #eef9f1;
+  border-color: #4e7a5e;
+  color: #2d6645;
+  box-shadow: inset 0 1px 3px rgba(78,122,94,0.12);
+  transform: none;
+}
+
+.comm-submit-toggle.active::after {
+  content: ' ×';
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+/* Close button inside submit card */
+.comm-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #8a9e93;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+.comm-close-btn:hover { color: #0d1f16; }
+
+/* ── Stats Row ───────────────────────────────── */
 .commission-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -57,21 +125,11 @@
 
 .commission-stat {
   background: #fff;
-  border-radius: 16px;
-  padding: 22px 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  border: 1px solid #f0f3f1;
-  position: relative;
-  overflow: hidden;
-}
-
-.commission-stat::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #4e9e6a, #77cc81);
-  border-radius: 3px 3px 0 0;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 20px rgba(0,0,0,0.04);
+  border: 1px solid #eef2ef;
+  border-left: 3px solid #4e7a5e;
 }
 
 .commission-stat span {
@@ -79,7 +137,7 @@
   color: #8a9e93;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.7px;
   text-transform: uppercase;
   margin-bottom: 10px;
 }
@@ -88,20 +146,12 @@
   display: block;
   color: #0d1f16;
   font-family: var(--font);
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 800;
   line-height: 1;
 }
 
-/* ── Submission Form Card ──────────────────── */
-.commission-submit-card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 28px 32px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  border: 1px solid #f0f3f1;
-}
-
+/* ── Submit Form Card ────────────────────────── */
 .commission-submit-card .commission-table-head h2 {
   color: #0d1f16;
 }
@@ -110,7 +160,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .commission-field {
@@ -133,9 +183,7 @@
   font-size: 12px;
 }
 
-.commission-required {
-  color: #e74c3c;
-}
+.commission-required { color: #e74c3c; }
 
 .commission-input,
 .commission-textarea {
@@ -147,14 +195,14 @@
   font-family: var(--font-body);
   font-size: 14px;
   resize: vertical;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
 
 .commission-input:focus,
 .commission-textarea:focus {
   outline: none;
   border-color: #5ea87a;
-  box-shadow: 0 0 0 3px rgba(94, 168, 122, 0.12);
+  box-shadow: 0 0 0 3px rgba(94,168,122,0.12);
 }
 
 .commission-file-input {
@@ -172,30 +220,32 @@
 }
 .commission-file-link:hover { text-decoration: underline; }
 
-/* ── Table Card ────────────────────────────── */
-.commission-table-card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 28px 32px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
-  border: 1px solid #f0f3f1;
-}
-
+/* ── Table Card ──────────────────────────────── */
 .commission-table-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 16px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.comm-head-left { display: flex; flex-direction: column; gap: 6px; }
+
+.comm-head-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .commission-table-head .side-card-kicker {
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.4px;
   text-transform: uppercase;
   color: #5ea87a;
-  margin-bottom: 4px;
+  margin: 0;
 }
 
 .commission-table-head h2 {
@@ -206,11 +256,48 @@
   margin: 0;
 }
 
+/* Search */
+.comm-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.comm-search-icon {
+  position: absolute;
+  left: 11px;
+  color: #8a9e93;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.comm-search-input {
+  height: 36px;
+  padding: 0 14px 0 34px;
+  border: 1px solid #dce8e0;
+  border-radius: 999px;
+  background: #f8fbf9;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: #2d3d34;
+  width: 200px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s, width 0.25s;
+}
+
+.comm-search-input:focus {
+  border-color: #5ea87a;
+  box-shadow: 0 0 0 3px rgba(94,168,122,0.10);
+  width: 240px;
+}
+
+.comm-search-input::placeholder { color: #9aab9f; }
+
 .thread-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 14px;
+  padding: 6px 14px;
   border-radius: 999px;
   background: #eef9f1;
   color: #3d8b5c;
@@ -221,7 +308,7 @@
   border: 1px solid #c9e8d4;
 }
 
-/* ── Table ─────────────────────────────────── */
+/* ── Table ───────────────────────────────────── */
 .commission-table-wrap {
   overflow-x: auto;
   border-radius: 12px;
@@ -240,11 +327,11 @@
 }
 
 .commission-table th {
-  padding: 12px 16px;
-  color: #7a9284;
+  padding: 11px 16px;
+  color: #8a9e93;
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.8px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   text-align: left;
   white-space: nowrap;
@@ -252,32 +339,109 @@
 }
 
 .commission-table td {
-  padding: 14px 16px;
+  padding: 13px 16px;
   border-top: 1px solid #f2f6f3;
-  font-size: 14px;
+  font-size: 13.5px;
   vertical-align: middle;
   color: #2d3d34;
 }
 
 .commission-table tbody tr {
-  transition: background 0.12s ease;
+  transition: background 0.1s;
 }
 
-.commission-table tbody tr:hover {
-  background: #f9fcfa;
+.commission-table tbody tr:hover { background: #f9fcfa; }
+
+/* Specific column helpers */
+.comm-sn {
+  color: #8a9e93;
+  font-size: 13px;
+  font-weight: 600;
+  width: 48px;
+  text-align: center;
 }
 
-.commission-description {
-  min-width: 200px;
+.comm-title-cell {
+  font-weight: 600;
+  color: #0d1f16;
+  min-width: 120px;
+}
+
+.comm-date-cell {
+  white-space: nowrap;
   color: #5a6e61;
   font-size: 13px;
 }
 
-/* ── Status Badges ─────────────────────────── */
+.comm-note-cell {
+  font-size: 13px;
+  color: #5a6e61;
+  max-width: 200px;
+}
+
+.commission-description {
+  min-width: 160px;
+  max-width: 260px;
+  color: #5a6e61;
+  font-size: 13px;
+}
+
+.comm-empty-cell {
+  color: #c5d3cc;
+  font-size: 13px;
+}
+
+/* Requester cell */
+.comm-requester {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.comm-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1.5px solid #e3ece6;
+}
+
+.comm-avatar-placeholder {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #e3ece6;
+  flex-shrink: 0;
+}
+
+.comm-requester-name {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  color: #0d1f16;
+}
+
+.comm-requester-sub {
+  display: block;
+  font-size: 11.5px;
+  color: #8a9e93;
+}
+
+/* Row count footer */
+.comm-count-row {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #8a9e93;
+  padding: 0 4px;
+}
+
+/* ── Status Badges ───────────────────────────── */
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 12px;
+  padding: 4px 11px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
@@ -285,85 +449,50 @@
   letter-spacing: 0.2px;
 }
 
-.status-badge.status-pending {
-  background: #fff8ec;
-  color: #c87f00;
-  border: 1px solid #ffe0a0;
-}
+.status-badge.status-pending   { background: #fff8ec; color: #c87f00; border: 1px solid #ffe0a0; }
+.status-badge.status-accepted  { background: #eef9f1; color: #2d8050; border: 1px solid #c9e8d4; }
+.status-badge.status-ongoing   { background: #edf4ff; color: #2a6adb; border: 1px solid #c0d8f8; }
+.status-badge.status-in-progress { background: #edf4ff; color: #2a6adb; border: 1px solid #c0d8f8; }
+.status-badge.status-delayed   { background: #fff3ec; color: #c05800; border: 1px solid #ffd4b3; }
+.status-badge.status-completed { background: #eef9f1; color: #2d8050; border: 1px solid #c9e8d4; }
+.status-badge.status-cancelled { background: #fef0ef; color: #c0392b; border: 1px solid #f7c6c2; }
 
-.status-badge.status-accepted {
-  background: #eef9f1;
-  color: #2d8050;
-  border: 1px solid #c9e8d4;
-}
-
-.status-badge.status-ongoing {
-  background: #edf4ff;
-  color: #2a6adb;
-  border: 1px solid #c0d8f8;
-}
-
-.status-badge.status-in-progress {
-  background: #edf4ff;
-  color: #2a6adb;
-  border: 1px solid #c0d8f8;
-}
-
-.status-badge.status-delayed {
-  background: #fff3ec;
-  color: #c05800;
-  border: 1px solid #ffd4b3;
-}
-
-.status-badge.status-completed {
-  background: #eef9f1;
-  color: #2d8050;
-  border: 1px solid #c9e8d4;
-}
-
-.status-badge.status-cancelled {
-  background: #fef0ef;
-  color: #c0392b;
-  border: 1px solid #f7c6c2;
-}
-
-/* ── Admin update form inline ──────────────── */
+/* ── Admin update form ───────────────────────── */
 .commission-form {
-  margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+  min-width: 160px;
 }
 
 .commission-select {
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 1px solid #dce8e0;
   border-radius: 8px;
   font-size: 13px;
   color: #2d3d34;
   background: #f8fbf9;
   cursor: pointer;
-  min-width: 130px;
 }
 
 .commission-note {
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 1px solid #dce8e0;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #2d3d34;
   background: #f8fbf9;
   resize: vertical;
-  min-height: 58px;
+  min-height: 54px;
   font-family: var(--font-body);
 }
 
 .commission-amount-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   color: #7a9284;
   font-size: 11px;
   font-weight: 700;
@@ -373,7 +502,7 @@
 
 .commission-amount-input {
   width: 100%;
-  padding: 7px 10px;
+  padding: 6px 10px;
   border: 1px solid #dce8e0;
   border-radius: 8px;
   color: #0d1f16;
@@ -383,9 +512,12 @@
   outline: none;
 }
 
-.commission-amount-input:focus {
+.commission-amount-input:focus,
+.commission-note:focus,
+.commission-select:focus {
   border-color: #5ea87a;
-  box-shadow: 0 0 0 3px rgba(94, 168, 122, 0.1);
+  box-shadow: 0 0 0 2px rgba(94,168,122,0.10);
+  outline: none;
 }
 
 .commission-amount-cell {
@@ -394,18 +526,24 @@
   white-space: nowrap;
 }
 
-/* ── Payment badges ────────────────────────── */
+/* ── Payment ─────────────────────────────────── */
 .commission-pay-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.comm-amount-text {
+  font-weight: 700;
+  color: #0d1f16;
   white-space: nowrap;
 }
 
 .commission-pay-cell form { margin: 0; }
 
 .commission-pay-btn {
-  height: 32px;
+  height: 30px;
   padding: 0 16px;
   border: none;
   border-radius: 999px;
@@ -415,7 +553,7 @@
   font-weight: 700;
   cursor: pointer;
   letter-spacing: 0.3px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 
 .commission-pay-btn:hover {
@@ -427,50 +565,33 @@
 .payment-badge {
   display: inline-flex;
   align-items: center;
-  padding: 5px 10px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.payment-badge.paid {
-  background: #eef9f1;
-  color: #2d8050;
-  border: 1px solid #c9e8d4;
-}
+.payment-badge.paid    { background: #eef9f1; color: #2d8050; border: 1px solid #c9e8d4; }
+.payment-badge.pending { background: #fff8ec; color: #c87f00; border: 1px solid #ffe0a0; }
 
-.payment-badge.pending {
-  background: #fff8ec;
-  color: #c87f00;
-  border: 1px solid #ffe0a0;
-}
-
-/* ── Page-level messages ───────────────────── */
+/* ── Page-level messages ─────────────────────── */
 .commission-page-msg {
-  padding: 14px 22px;
+  padding: 13px 20px;
   border-radius: 12px;
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 500;
 }
 
-.commission-msg-ok {
-  background: #eef9f1;
-  color: #2d8050;
-  border: 1px solid #c9e8d4;
-}
+.commission-msg-ok    { background: #eef9f1; color: #2d8050; border: 1px solid #c9e8d4; }
+.commission-msg-error { background: #fef0ef; color: #c0392b; border: 1px solid #f7c6c2; }
 
-.commission-msg-error {
-  background: #fef0ef;
-  color: #c0392b;
-  border: 1px solid #f7c6c2;
-}
-
-/* ── Save button ───────────────────────────── */
+/* ── Save button ─────────────────────────────── */
 .action-btn.btn-save {
   align-self: flex-start;
-  padding: 7px 16px;
+  height: 30px;
+  padding: 0 14px;
   border: none;
   border-radius: 8px;
   background: #1a3328;
@@ -478,7 +599,7 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s, transform 0.15s;
   letter-spacing: 0.2px;
 }
 
@@ -487,7 +608,29 @@
   transform: translateY(-1px);
 }
 
-/* ── Empty state ───────────────────────────── */
+/* ── Submit button ───────────────────────────── */
+.thread-send {
+  align-self: flex-start;
+  height: 38px;
+  padding: 0 22px;
+  border: none;
+  border-radius: 999px;
+  background: #1a3328;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.2px;
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.thread-send:hover {
+  background: #2d5040;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(26,51,40,0.22);
+}
+
+/* ── Empty state ─────────────────────────────── */
 .messages-empty {
   min-height: 180px;
   display: flex;
@@ -497,7 +640,7 @@
   gap: 8px;
   padding: 32px;
   border: 1.5px dashed #d4e0d8;
-  border-radius: 16px;
+  border-radius: 14px;
   background: #f9fbf9;
   color: #6b7c72;
   text-align: center;
@@ -509,58 +652,23 @@
   font-family: var(--font);
 }
 
-.commission-empty { min-height: 240px; }
+.commission-empty { min-height: 220px; }
 
-/* ── Submit button (thread-send reuse) ─────── */
-.thread-send {
-  align-self: flex-start;
-  padding: 10px 22px;
-  border: none;
-  border-radius: 999px;
-  background: #1a3328;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: 0.2px;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.thread-send:hover {
-  background: #2d5040;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(26,51,40,0.22);
-}
-
-/* ── Dashboard body override for commissions ─ */
-.commissions-dashboard {
-  background: #f3f7f4;
-  min-height: calc(100vh - var(--nav-height));
-  padding: 16px 12px 32px;
-  display: flex;
-  justify-content: center;
-}
-
-/* ── Responsive ────────────────────────────── */
+/* ── Responsive ──────────────────────────────── */
 @media (max-width: 980px) {
-  .commission-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .commission-hero {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+  .commission-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .commission-hero  { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 640px) {
-  .commission-stats {
-    grid-template-columns: 1fr;
-  }
+  .commission-stats { grid-template-columns: 1fr; }
 
   .commission-hero,
   .commission-submit-card,
   .commission-table-card {
     padding: 20px 18px;
   }
+
+  .comm-search-input { width: 150px; }
+  .comm-search-input:focus { width: 180px; }
 }

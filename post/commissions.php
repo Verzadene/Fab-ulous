@@ -44,7 +44,6 @@ if (isset($_GET['payment'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'list') {
     header('Content-Type: application/json');
     $data = $commissionRepo->getCommissionsWithStats($isAdmin, $userId);
-    
     echo json_encode(array_merge(['success' => true], $data));
     exit;
 }
@@ -98,19 +97,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
   <div class="dashboard-body commissions-dashboard">
     <div class="commissions-layout">
 
+      <!-- ── Overview Card ── -->
       <section class="commission-hero side-card">
         <div class="commission-hero-copy">
           <p class="side-card-kicker">Orders</p>
           <?php if ($isAdmin): ?>
             <h1>Commission Master List</h1>
-            <p>All platform commission requests. Full platform overview.</p>
+            <p>Full platform overview of all commission requests.</p>
           <?php else: ?>
-            <h1>Your Commission History</h1>
+            <h1>Commission Overview</h1>
             <p>Track the status of your FABulous service requests in one place.</p>
           <?php endif; ?>
         </div>
+        <?php if (!$isAdmin): ?>
+        <button class="comm-submit-toggle" id="submitToggle" onclick="toggleSubmitForm()">
+          + Submit a Commission
+        </button>
+        <?php endif; ?>
       </section>
 
+      <!-- ── Payment / submission messages ── -->
       <?php if ($pageMsg): ?>
         <div id="commissionPageMsg" class="commission-page-msg <?php echo $pageMsgIsError ? 'commission-msg-error' : 'commission-msg-ok'; ?>">
           <?php echo htmlspecialchars($pageMsg); ?>
@@ -119,20 +125,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
         <div id="commissionPageMsg" class="commission-page-msg" style="display:none;"></div>
       <?php endif; ?>
 
+      <!-- ── Stats Row ── -->
       <section class="commission-stats">
-        <article class="commission-stat side-card"><span>Total Requests</span><strong id="statTotal">0</strong></article>
-        <article class="commission-stat side-card"><span>Pending</span><strong id="statPending">0</strong></article>
-        <article class="commission-stat side-card"><span>In Progress</span><strong id="statActive">0</strong></article>
-        <article class="commission-stat side-card"><span>Total Value</span><strong id="statSpent">&#8369;0.00</strong></article>
+        <article class="commission-stat">
+          <span>Total Requests</span>
+          <strong id="statTotal">—</strong>
+        </article>
+        <article class="commission-stat">
+          <span>Pending</span>
+          <strong id="statPending">—</strong>
+        </article>
+        <article class="commission-stat">
+          <span>In Progress</span>
+          <strong id="statActive">—</strong>
+        </article>
+        <article class="commission-stat">
+          <span>Total Value</span>
+          <strong id="statSpent">—</strong>
+        </article>
       </section>
 
+      <!-- ── Submit Form (users only, collapsible) ── -->
       <?php if (!$isAdmin): ?>
-      <section class="commission-submit-card side-card">
+      <section class="commission-submit-card side-card" id="submitFormCard" style="display:none;">
         <div class="commission-table-head">
           <div>
             <p class="side-card-kicker">New Request</p>
             <h2>Submit a Commission</h2>
           </div>
+          <button class="comm-close-btn" onclick="toggleSubmitForm()" title="Close form">&times;</button>
         </div>
         <form id="submitCommissionForm" enctype="multipart/form-data" class="commission-submit-form" onsubmit="submitCommission(event)">
           <div class="commission-field">
@@ -152,13 +173,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
       </section>
       <?php endif; ?>
 
+      <!-- ── Commission Table ── -->
       <section class="commission-table-card side-card">
         <div class="commission-table-head">
-          <div>
+          <div class="comm-head-left">
             <p class="side-card-kicker">Updates</p>
-            <h2>Recent Requests</h2>
+            <div class="comm-head-title-row">
+              <h2>Recent Requests</h2>
+              <span class="thread-badge" id="completedBadge">0 Completed</span>
+            </div>
           </div>
-          <span class="thread-badge" id="completedBadge">0 Completed</span>
+          <div class="comm-search-wrap">
+            <svg class="comm-search-icon" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="commSearch" class="comm-search-input" placeholder="Search by field…" oninput="filterTable(this.value)"/>
+          </div>
         </div>
 
         <div class="messages-empty commission-empty" id="emptyState" style="display:none;">
@@ -167,14 +197,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
         </div>
 
         <div class="commission-table-wrap" id="tableWrap" style="display:none;">
-          <table class="commission-table">
+          <table class="commission-table" id="commTable">
             <thead>
               <tr>
+                <th>S/N</th>
                 <?php if ($isAdmin): ?>
-                  <th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
-                  <th>Status / Update</th><th>Amount</th><th>Payment</th><th>File</th><th>Submitted</th>
+                  <th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
+                  <th>Status</th><th>Update</th><th>Amount</th><th>Payment</th><th>File</th><th>Submitted</th>
                 <?php else: ?>
-                  <th>ID</th><th>Title</th><th>Description</th><th>Status</th>
+                  <th>Title</th><th>Description</th><th>Status</th>
                   <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>File</th>
                 <?php endif; ?>
               </tr>
@@ -182,6 +213,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
             <tbody id="commissionsTableBody">
             </tbody>
           </table>
+        </div>
+
+        <div class="comm-count-row" id="commCountRow" style="display:none;">
+          Showing <strong id="commCountShown">0</strong> of <strong id="commCountTotal">0</strong> commissions
         </div>
       </section>
 
@@ -211,6 +246,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
     const isAdmin = <?php echo $isAdmin ? 'true' : 'false'; ?>;
     const allowedStatuses = <?php echo json_encode($allowedStatuses); ?>;
 
+    let allCommissions = [];
+
     function esc(val) {
       const div = document.createElement('div');
       div.textContent = String(val ?? '');
@@ -223,7 +260,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
     }
 
     function formatMoney(amount) {
-      return '₱' + new Intl.NumberFormat('en-PH', {minimumFractionDigits: 2, maximumFractionDigits:2}).format(Number(amount));
+      return '₱' + new Intl.NumberFormat('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(Number(amount));
+    }
+
+    function toggleSubmitForm() {
+      const card = document.getElementById('submitFormCard');
+      const btn  = document.getElementById('submitToggle');
+      if (!card) return;
+      const isOpen = card.style.display !== 'none';
+      card.style.display = isOpen ? 'none' : 'block';
+      if (btn) btn.classList.toggle('active', !isOpen);
     }
 
     async function loadCommissions() {
@@ -231,8 +277,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
         const response = await fetch('commissions.php?action=list');
         const data = await response.json();
         if (data.success) {
+          allCommissions = data.commissions || [];
           updateStats(data.stats);
-          renderCommissions(data.commissions);
+          renderCommissions(allCommissions);
         }
       } catch (error) {
         console.error('Error loading commissions:', error);
@@ -240,35 +287,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
     }
 
     function updateStats(stats) {
-      document.getElementById('statTotal').textContent = new Intl.NumberFormat().format(stats.total);
+      document.getElementById('statTotal').textContent   = new Intl.NumberFormat().format(stats.total);
       document.getElementById('statPending').textContent = new Intl.NumberFormat().format(stats.pending);
-      document.getElementById('statActive').textContent = new Intl.NumberFormat().format(stats.active);
-      document.getElementById('statSpent').innerHTML = '&#8369;' + new Intl.NumberFormat('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}).format(stats.spent);
+      document.getElementById('statActive').textContent  = new Intl.NumberFormat().format(stats.active);
+      document.getElementById('statSpent').innerHTML     = '&#8369;' + new Intl.NumberFormat('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(stats.spent);
       const badge = document.getElementById('completedBadge');
       if (badge) badge.textContent = new Intl.NumberFormat().format(stats.completed) + ' Completed';
     }
 
+    function filterTable(query) {
+      if (!query) {
+        renderCommissions(allCommissions);
+        return;
+      }
+      const q = query.toLowerCase();
+      const filtered = allCommissions.filter(c => {
+        return (c.title || '').toLowerCase().includes(q)
+          || (c.description || '').toLowerCase().includes(q)
+          || (c.status || '').toLowerCase().includes(q)
+          || (c.requester_username || '').toLowerCase().includes(q)
+          || (c.requester_email || '').toLowerCase().includes(q)
+          || String(c.commissionID).includes(q);
+      });
+      renderCommissions(filtered);
+    }
+
     function renderCommissions(commissions) {
-      const tbody = document.getElementById('commissionsTableBody');
+      const tbody      = document.getElementById('commissionsTableBody');
       const emptyState = document.getElementById('emptyState');
-      const tableWrap = document.getElementById('tableWrap');
+      const tableWrap  = document.getElementById('tableWrap');
+      const countRow   = document.getElementById('commCountRow');
 
       if (!commissions || commissions.length === 0) {
         emptyState.style.display = 'flex';
-        document.getElementById('emptyStateMsg').textContent = isAdmin ? 'No commissions have been submitted yet.' : 'Use the form above to submit your first commission request.';
+        document.getElementById('emptyStateMsg').textContent = isAdmin
+          ? 'No commissions have been submitted yet.'
+          : 'Use the button above to submit your first commission request.';
         tableWrap.style.display = 'none';
+        if (countRow) countRow.style.display = 'none';
         return;
       }
 
       emptyState.style.display = 'none';
-      tableWrap.style.display = 'block';
+      tableWrap.style.display  = 'block';
 
-      tbody.innerHTML = commissions.map(c => {
+      if (countRow) {
+        countRow.style.display = 'block';
+        document.getElementById('commCountShown').textContent = commissions.length;
+        document.getElementById('commCountTotal').textContent = allCommissions.length;
+      }
+
+      tbody.innerHTML = commissions.map((c, idx) => {
+        const sn    = idx + 1;
         const title = esc(c.title || 'Untitled');
-        const desc = esc(c.description || '').substring(0, 96);
+        const desc  = esc(c.description || '').substring(0, 96);
         const statusClass = 'status-' + (c.status || '').toLowerCase().replace(/ /g, '-');
-        const amountNum = Number(c.amount || 0);
-        
+        const amountNum   = Number(c.amount || 0);
+
         let paymentHtml = '';
         if (c.payment_status === 'paid') {
           paymentHtml = '<span class="payment-badge paid">Paid</span>';
@@ -276,40 +351,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
           paymentHtml = `<span class="payment-badge pending">${esc(c.payment_status.charAt(0).toUpperCase() + c.payment_status.slice(1))}</span>`;
         }
 
-        let fileHtml = '<span style="color:rgba(255,255,255,0.3);">—</span>';
+        let fileHtml = '<span class="comm-empty-cell">—</span>';
         if (c.attachment_url) {
           fileHtml = `<a href="../${esc(c.attachment_url)}" target="_blank" class="commission-file-link">&#128196; View</a>`;
         }
 
         if (isAdmin) {
-          const picUrl = c.requester_pic ? '../uploads/profile_pics/' + encodeURIComponent(c.requester_pic) : null;
-          const picHtml = picUrl ? `<img src="${esc(picUrl)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" alt=""/>` : '';
+          const picUrl  = c.requester_pic ? '../uploads/profile_pics/' + encodeURIComponent(c.requester_pic) : null;
+          const picHtml = picUrl ? `<img src="${esc(picUrl)}" class="comm-avatar" alt=""/>` : '<span class="comm-avatar-placeholder"></span>';
           const statusOptions = allowedStatuses.map(s => `<option value="${s}" ${c.status === s ? 'selected' : ''}>${s}</option>`).join('');
-          
-          if (!paymentHtml) paymentHtml = '<span style="color:rgba(255,255,255,0.3);">—</span>';
+          if (!paymentHtml) paymentHtml = '<span class="comm-empty-cell">—</span>';
 
           return `
             <tr>
-              <td>#${c.commissionID}</td>
+              <td class="comm-sn">${sn}</td>
               <td>
-                <div style="display:flex;align-items:center;gap:8px;">
+                <div class="comm-requester">
                   ${picHtml}
                   <div>
-                    <strong>${esc(c.requester_username)}</strong><br/>
-                    <small>${esc(c.requester_name)}</small>
+                    <span class="comm-requester-name">${esc(c.requester_username)}</span>
+                    <span class="comm-requester-sub">${esc(c.requester_name)}</span>
                   </div>
                 </div>
               </td>
               <td><a class="commission-file-link" href="mailto:${esc(c.requester_email)}">${esc(c.requester_email)}</a></td>
-              <td>${title}</td>
+              <td class="comm-title-cell">${title}</td>
               <td class="commission-description">${desc}</td>
+              <td><span class="status-badge ${statusClass}">${esc(c.status)}</span></td>
               <td>
-                <span class="status-badge ${statusClass}">${esc(c.status)}</span>
                 <form class="commission-form" onsubmit="saveCommission(event, ${c.commissionID})">
                   <select name="commission_status" class="commission-select">${statusOptions}</select>
                   <textarea name="admin_note" class="commission-note" placeholder="Progress update / note">${esc(c.admin_note)}</textarea>
                   <label class="commission-amount-label">
-                    Amount
+                    Amount (₱)
                     <input type="number" name="amount" class="commission-amount-input" value="${amountNum.toFixed(2)}" min="0" step="0.01"/>
                   </label>
                   <button type="submit" class="action-btn btn-save">Save</button>
@@ -318,33 +392,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
               <td class="commission-amount-cell">${formatMoney(amountNum)}</td>
               <td>${paymentHtml}</td>
               <td>${fileHtml}</td>
-              <td>${formatDate(c.created_at)}</td>
+              <td class="comm-date-cell">${formatDate(c.created_at)}</td>
             </tr>
           `;
         } else {
-          let payCellHtml = `<span>${formatMoney(amountNum)}</span>`;
+          let payCellHtml = `<span class="comm-amount-text">${formatMoney(amountNum)}</span>`;
           if (amountNum > 0 && c.payment_status !== 'paid') {
-             payCellHtml += `
-               <form method="POST" action="paymongo_checkout.php">
-                 <input type="hidden" name="commission_id" value="${c.commissionID}"/>
-                 <button type="submit" class="commission-pay-btn">Pay</button>
-               </form>
-             `;
+            payCellHtml += `
+              <form method="POST" action="paymongo_checkout.php">
+                <input type="hidden" name="commission_id" value="${c.commissionID}"/>
+                <button type="submit" class="commission-pay-btn">Pay</button>
+              </form>
+            `;
           }
           if (!paymentHtml) {
-             paymentHtml = amountNum > 0 ? '<span class="payment-badge pending">Unpaid</span>' : '<span style="color:rgba(255,255,255,0.3);">Awaiting amount</span>';
+            paymentHtml = amountNum > 0
+              ? '<span class="payment-badge pending">Unpaid</span>'
+              : '<span class="comm-empty-cell">Awaiting amount</span>';
           }
 
           return `
             <tr>
-              <td>#${c.commissionID}</td>
-              <td>${title}</td>
+              <td class="comm-sn">${sn}</td>
+              <td class="comm-title-cell">${title}</td>
               <td class="commission-description">${desc}</td>
               <td><span class="status-badge ${statusClass}">${esc(c.status)}</span></td>
               <td><div class="commission-pay-cell">${payCellHtml}</div></td>
               <td>${paymentHtml}</td>
-              <td>${formatDate(c.created_at)}</td>
-              <td>${esc(c.admin_note || 'No update yet.')}</td>
+              <td class="comm-date-cell">${formatDate(c.created_at)}</td>
+              <td class="comm-note-cell">${esc(c.admin_note || 'No update yet.')}</td>
               <td>${fileHtml}</td>
             </tr>
           `;
@@ -361,14 +437,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
       try {
         const response = await fetch('commissions.php', { method: 'POST', body: formData });
         const data = await response.json();
-        
+
         const msgBox = document.getElementById('commissionPageMsg');
         msgBox.style.display = 'block';
-        
+
         if (data.success) {
           msgBox.className = 'commission-page-msg commission-msg-ok';
           msgBox.textContent = data.message;
           form.reset();
+          toggleSubmitForm();
           loadCommissions();
         } else {
           msgBox.className = 'commission-page-msg commission-msg-error';
@@ -386,15 +463,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isAdmin && ($_POST['action'] ?? '
       data.append('action', 'update_commission');
       data.append('target_id', id);
       try {
-        const r = await fetch('commissions.php', { method: 'POST', body: new URLSearchParams(data) });
+        const r    = await fetch('commissions.php', { method: 'POST', body: new URLSearchParams(data) });
         const json = await r.json();
-        if (json.success) {
-          loadCommissions();
-        }
+        if (json.success) { loadCommissions(); }
       } catch (e) { console.error(e); }
     }
-    
-    // Auto-load on init
+
     loadCommissions();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
