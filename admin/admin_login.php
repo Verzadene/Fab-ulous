@@ -102,7 +102,7 @@ $isLocked = $lockoutRemaining > 0;
   </div>
 
   <div class="auth-viewport">
-    <div class="auth-slider" id="authSlider" style="transform: translateX(-100%);">
+    <div class="auth-slider" id="authSlider">
       <!-- Pos 0: Login -->
       <div class="auth-slider-step"></div>
       <!-- Pos 1: Admin -->
@@ -186,41 +186,10 @@ $isLocked = $lockoutRemaining > 0;
       }, 1000);
     })();
 
-    // Page Transition Animation Logic
-    document.addEventListener('DOMContentLoaded', () => {
-      const slider = document.getElementById('authSlider');
-      if (!slider) return;
-
-      const slideFrom = sessionStorage.getItem('slideFrom');
-      if (slideFrom === 'login' || slideFrom === 'register') {
-        slider.style.transition = 'none';
-        slider.style.transform = slideFrom === 'login' ? 'translateX(0)' : 'translateX(-200%)';
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            slider.style.transition = 'transform 0.4s ease-in-out';
-            slider.style.transform = 'translateX(-100%)';
-          });
-        });
-        sessionStorage.removeItem('slideFrom');
-      }
-
-      document.querySelectorAll('a').forEach(link => {
-        link.addEventListener('click', e => {
-          const href = link.getAttribute('href');
-          if (!href) return;
-
-          let targetPos = href.includes('register.html') ? 2 : (href.includes('login.php') && !href.includes('admin_login.php') ? 0 : -1);
-          if (targetPos !== -1) {
-            e.preventDefault();
-            sessionStorage.setItem('slideFrom', 'admin');
-            slider.style.transition = 'transform 0.4s ease-in-out';
-            slider.style.transform = `translateX(-${targetPos * 100}%)`;
-            setTimeout(() => window.location.href = link.href, 400);
-          }
-        });
-      });
-    });
+    // Auth slider animation + bfcache fix — see login/auth_slider.js
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="../login/auth_slider.js"></script>
+  <script>AuthSlider.init({ page: 'admin' });</script>
 </body>
 </html>
