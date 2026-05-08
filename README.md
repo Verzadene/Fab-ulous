@@ -34,8 +34,8 @@ Community platform for sharing software and hardware projects in one space. The 
 Fab-ulous/
 ├── admin/                        # Admin-only pages and tools
 │   ├── admin.php                 # Main admin dashboard (user mgmt, commissions, audit log)
-│   ├── admin_login.php           # Admin credential + MFA entry point
-│   ├── admin_logout.php          # Session teardown for admin
+│   ├── admin_login.php           # Admin credential + MFA entry point; redirects authenticated users to their dashboard
+│   ├── admin_logout.php          # Session teardown for admin: writes audit log → destroys session → landing
 │   ├── admin_login.css           # Admin login standalone styles
 │   ├── admin.css                 # Admin dashboard styles
 │   ├── AdminRepository.php       # DB abstraction: user banning, deletion, audit log, commission oversight
@@ -73,11 +73,11 @@ Fab-ulous/
 │   └── landing.css
 │
 ├── login/
-│   ├── login.php                 # User login: credential check → MFA challenge → verify_mfa.php
+│   ├── login.php                 # User login: credential check → MFA challenge → verify_mfa.php; redirects authenticated users
 │   ├── login.css                 # Shared auth page styles (used by login, admin login, MFA, forgot-pw, reset-pw)
 │   ├── auth_slider.js            # Shared auth-panel slide animation + bfcache Back-button fix (used by login.php, admin/admin_login.php, register/register.html)
-│   ├── logout.php                # User session teardown → landing
-│   ├── verify_mfa.php            # Email MFA code entry; completes session after correct code
+│   ├── logout.php                # User session teardown: writes audit log → destroys session → landing
+│   ├── verify_mfa.php            # Email MFA code entry; writes audit log on success; completes session after correct code
 │   ├── verify_mfa.css            # MFA-specific style overrides
 │   ├── forgot_password.php       # Request 6-digit reset code by email
 │   └── reset_password.php        # Submit reset code + new password
@@ -132,6 +132,7 @@ Fab-ulous/
 │   ├── posts/                    # Post images
 │   └── commissions/              # Commission attachments (PDF, STL)
 │
+├── auth_status.php               # GET: JSON session-status ping used by HTML pages for auth redirect
 ├── CLAUDE.md                     # AI assistant context and project guardrails
 └── README.md                     # This file
 ```
