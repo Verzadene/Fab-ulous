@@ -19,6 +19,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// --- Email domain validation ---
+const ALLOWED_EMAIL_DOMAINS = ['gmail.com', 'dlsud.edu.ph', 'outlook.com'];
+
+function isEmailDomainAllowed(email) {
+  const parts = email.split('@');
+  if (parts.length !== 2) {
+    return false;
+  }
+  const domain = parts[1].toLowerCase().trim();
+  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+}
+
+function getEmailErrorMessage() {
+  return 'Unsupported email domain. Please use @gmail.com, @dlsud.edu.ph, or @outlook.com.';
+}
+
 // --- Password strength checklist ---
 function setCheck(id, met) {
   const row = document.getElementById(id);
@@ -44,8 +60,18 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('regForm').addEventListener('submit', function(e) {
   e.preventDefault();
 
+  const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const confirmPassword = document.getElementById('confirmPassword').value;
+  const errDiv = document.getElementById('errorMsg');
+
+  // Validate email domain
+  if (!isEmailDomainAllowed(email)) {
+    errDiv.textContent = getEmailErrorMessage();
+    errDiv.style.display = 'block';
+    document.getElementById('email').focus();
+    return;
+  }
 
   if (password.length < 8) {
     alert('Password must be at least 8 characters long.');
@@ -97,6 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
     errDiv.style.display = 'block';
   } else if (error === 'email_failed') {
     errDiv.textContent = 'Could not send verification email. Please try again later.';
+    errDiv.style.display = 'block';
+  } else if (error === 'invalid_email_domain') {
+    errDiv.textContent = getEmailErrorMessage();
     errDiv.style.display = 'block';
   }
 });

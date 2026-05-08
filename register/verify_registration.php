@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $newCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
             $upd = $connPending->prepare(
-                'UPDATE pending_registrations SET verify_code=?, code_expires_at=DATE_ADD(NOW(), INTERVAL 60 MINUTE), updated_at=NOW() WHERE email=?'
+                'UPDATE pending_registrations SET verification_code=?, expires_at=DATE_ADD(NOW(), INTERVAL 60 MINUTE) WHERE email=?'
             );
             $upd->bind_param('ss', $newCode, $pendingEmail);
             $upd->execute();
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $submitted = trim($_POST['verification_code'] ?? '');
         $chk = $connPending->prepare(
-            'SELECT id, first_name, last_name, username, email, password_hash, google_id, verify_code, code_expires_at
+            'SELECT id, first_name, last_name, username, email, password_hash, google_id, verification_code, expires_at
              FROM pending_registrations WHERE email=? LIMIT 1'
         );
         $chk->bind_param('s', $pendingEmail);
@@ -61,9 +61,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Registration session expired. Please register again.';
         } elseif (empty($submitted)) {
             $error = 'Enter the 6-digit verification code.';
-        } elseif ($pending['verify_code'] !== $submitted) {
+        } elseif ($pending['verification_code'] !== $submitted) {
             $error = 'That code is incorrect.';
-        } elseif (strtotime($pending['code_expires_at']) < time()) {
+        } elseif (strtotime($pending['expires_at']) < time()) {
             $error = 'That code has expired. Request a new one.';
         } else {
             // Insert verified account into accounts

@@ -30,6 +30,12 @@ $lastName  = trim($_POST['lastName']  ?? '');
 $username  = trim($_POST['username']  ?? '');
 $email     = strtolower(trim($_POST['email'] ?? ''));
 
+// Validate email domain
+if (!is_email_domain_allowed($email)) {
+    header('Location: ../register/register.html?error=invalid_email_domain');
+    exit;
+}
+
 // Check if email or username already exists in accounts
 $connAccounts = db_connect('accounts');
 $checkStmt = $connAccounts->prepare('SELECT email, username FROM accounts WHERE email = ? OR username = ?');
@@ -102,12 +108,12 @@ $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
 // Upsert into pending_registrations
 $stmt = $connPending->prepare(
-    'INSERT INTO pending_registrations (first_name, last_name, username, email, password_hash, verify_code, code_expires_at)
+    'INSERT INTO pending_registrations (first_name, last_name, username, email, password_hash, verification_code, expires_at)
      VALUES (?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 60 MINUTE))
      ON DUPLICATE KEY UPDATE
        first_name=VALUES(first_name), last_name=VALUES(last_name), username=VALUES(username),
-       password_hash=VALUES(password_hash), verify_code=VALUES(verify_code),
-       code_expires_at=DATE_ADD(NOW(), INTERVAL 60 MINUTE), updated_at=NOW()'
+       password_hash=VALUES(password_hash), verification_code=VALUES(verification_code),
+       expires_at=DATE_ADD(NOW(), INTERVAL 60 MINUTE)'
 );
 $stmt->bind_param('ssssss', $firstName, $lastName, $username, $email, $hashedPassword, $code);
 

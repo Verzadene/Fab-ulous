@@ -78,6 +78,12 @@ $nameParts = preg_split('/\s+/', $fullName, 2) ?: [];
 $firstName = $nameParts[0] ?? 'Google';
 $lastName = $nameParts[1] ?? 'User';
 
+// Validate email domain against whitelist
+if (!is_email_domain_allowed($email)) {
+    header('Location: ../login/login.php?error=oauth_unsupported_domain');
+    exit;
+}
+
 $check = $connAccounts->prepare('SELECT * FROM accounts WHERE google_id = ? OR email = ? LIMIT 1');
 $check->bind_param('ss', $googleId, $email);
 $check->execute();
