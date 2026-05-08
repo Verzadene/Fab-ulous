@@ -77,6 +77,17 @@ Treat as sign-in for **existing accounts only**. If the Google email is not foun
 ### 8. UI/UX Consistency
 Keep typography (`Josefin Sans`, `Inter`) and design tokens (green palette, rounded controls) consistent. Preserve the current visual language and responsive layout patterns.
 
+### 10. Auth Slider Animations
+The three-panel sliding transition between `login.php`, `admin/admin_login.php`, and `register/register.html` is managed by a single shared file: **`login/auth_slider.js`**.
+
+**Architecture:**
+- Each auth page loads `auth_slider.js` and calls `AuthSlider.init({ page: '<pageName>' })` at the bottom of `<body>`.
+- Valid page names: `'login'` (offset 0), `'admin'` (offset -100%), `'register'` (offset -200%).
+- The module uses `window.addEventListener('pageshow', ...)` — **not** `DOMContentLoaded` — so it fires on both fresh loads and Back-Forward Cache (bfcache) restores.
+- On a bfcache restore (`event.persisted === true`), the slider is immediately snapped back to its canonical resting position and stale `sessionStorage` is cleared, preventing the `.card-container` disappearing bug.
+- On a fresh load, it reads `sessionStorage.slideFrom` to decide whether to animate in, then attaches click interceptors for outgoing navigation.
+- Do **not** put any slider `transform` logic inline in the auth pages or in `register.js`. All slider state lives in `auth_slider.js`.
+
 ### 9. Uploads & Paths
 Validate MIME type and file size. Ensure target folders exist. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...`.
 
