@@ -70,6 +70,13 @@ defined('MAIL_FROM_NAME') || define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?
 defined('MFA_CODE_TTL_MINUTES') || define('MFA_CODE_TTL_MINUTES', 10);
 defined('MFA_RESEND_COOLDOWN_SECONDS') || define('MFA_RESEND_COOLDOWN_SECONDS', 60);
 
+// Email Domain Whitelist
+defined('ALLOWED_EMAIL_DOMAINS') || define('ALLOWED_EMAIL_DOMAINS', [
+    'gmail.com',
+    'dlsud.edu.ph',
+    'outlook.com',
+]);
+
 $GLOBALS['FABULOUS_LAST_MAIL_ERROR'] = '';
 
 /**
@@ -378,6 +385,25 @@ function mask_email_address(string $email): string
     $hiddenLength = max(2, strlen($local) - 2);
 
     return $visible . str_repeat('*', $hiddenLength) . '@' . $domain;
+}
+
+/**
+ * Validates if an email address uses an allowed domain.
+ * 
+ * @param string $email The email address to validate.
+ * @return bool True if the domain is whitelisted, false otherwise.
+ */
+function is_email_domain_allowed(string $email): bool
+{
+    $parts = explode('@', $email, 2);
+    if (count($parts) !== 2) {
+        return false;
+    }
+
+    $domain = strtolower(trim($parts[1]));
+    $allowedDomains = ALLOWED_EMAIL_DOMAINS;
+
+    return in_array($domain, $allowedDomains, true);
 }
 
 function set_last_mail_error(string $message): void

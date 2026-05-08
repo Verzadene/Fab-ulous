@@ -124,6 +124,33 @@ User login and logout events are now tracked in the `audit_log` table in the `fa
 
 **Filter compatibility:** Because `admin_username`, `action`, `first_name`, and `last_name` are all columns already included in `AdminRepository::searchAuditLogs()`, the existing search bar (Username / First Name / Last Name) and time filter (8 hrs, 24 hrs, etc.) cover these new events with no additional code.
 
+### 13. Email Domain Whitelist
+User registration and Google OAuth sign-in are restricted to a whitelist of approved email domains for security and organizational purposes.
+
+**Allowed domains:**
+- `@gmail.com`
+- `@dlsud.edu.ph`
+- `@outlook.com`
+
+**Configuration:**
+- The whitelist is defined in `config.php` as the `ALLOWED_EMAIL_DOMAINS` constant (an array of domain strings).
+- To modify the whitelist, update `ALLOWED_EMAIL_DOMAINS` in `config.php`. The constant is also available in `config.local.php` for environment-specific overrides.
+
+**Validation layers:**
+1. **Frontend (register.html / register.js):** Email domain validation occurs on form submit before sending to the server. The `isEmailDomainAllowed()` function checks the domain and displays an error message if unsupported. This provides immediate user feedback without a server round-trip.
+2. **Backend (register.php):** The `is_email_domain_allowed($email)` helper function (defined in `config.php`) validates the email domain. Non-whitelisted domains are rejected with error code `invalid_email_domain`, redirecting to `register.html?error=invalid_email_domain`.
+3. **Google OAuth (oauth2callback.php):** After exchanging the authorization code and fetching user info from Google, the email domain is validated **before** checking if the user exists in the database. Non-whitelisted Google emails are rejected with error code `oauth_unsupported_domain`.
+
+**Error messages:**
+- **Frontend submit:** "Unsupported email domain. Please use @gmail.com, @dlsud.edu.ph, or @outlook.com."
+- **Backend redirect:** Shown in `register.html` with the same message.
+- **Google OAuth rejection:** Users see "Unsupported email domain. Please use @gmail.com, @dlsud.edu.ph, or @outlook.com." in the login error panel.
+
+**Important notes:**
+- The `is_email_domain_allowed()` function is case-insensitive for domain comparison (uses `strtolower()`).
+- Domain validation happens **after** all other checks (e.g., password strength, existing user checks) to provide clear, focused error messages.
+- Google OAuth treats unsupported domains as a fatal error — a registration-first message is not shown. If a user attempts Google sign-in with an unsupported domain, they are redirected to login with the error message and cannot proceed to registration.
+
 ---
 
 ## Commission System Architecture
