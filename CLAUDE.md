@@ -126,6 +126,34 @@ User login and logout events are now tracked in the `audit_log` table in the `fa
 
 ---
 
+## Commission System Architecture
+
+### Role Separation (effective after refactor)
+
+The commission system is split into two strictly separated surfaces:
+
+| Surface | File | Who uses it | What it does |
+|---|---|---|---|
+| **Client interface** | `post/commissions.php` | All roles (user, admin, super_admin) | Submit a personal commission request; track own requests; pay via PayMongo |
+| **Admin management** | `admin/admin.php` → Commissions tab | admin, super_admin only | View all platform commissions; update status/note/amount; view/download attached files |
+
+**Key rules:**
+- `post/commissions.php` **always** calls `getAllCommissions(false, $userId)` — it fetches only the signed-in user's own rows, regardless of role. An admin who visits `commissions.php` sees only their personal requests.
+- `admin/admin.php` **always** calls `getAllCommissions(true, $adminID)` to get the full platform list.
+- The AJAX update endpoint for admin saves is `admin/commission_update.php` (not `commissions.php`).
+
+### No Self-Approval Rule
+
+An admin **cannot approve, reject, or modify** a commission they personally submitted. Enforced at two layers:
+
+1. **UI layer (`admin.php`):** Rows where `$c['userID'] === $adminID` render a locked `🔒 Self-request` placeholder instead of the update form. The select, note, amount field, and Save button are never rendered for self-submissions.
+2. **Server layer (`admin/commission_update.php`):** Before processing any update, the endpoint fetches the commission's `userID` and compares it to `$_SESSION['user']['id']`. If they match it returns `{success: false, error: '...'}` and exits — the update is blocked regardless of what the client sends.
+
+### Session Variable Used
+The check uses `$_SESSION['user']['id']` (set by `begin_user_session()` in `config.php`) compared against `commissions.userID` (now explicitly SELECTed as `c.userID` in `CommissionRepository::getAllCommissions()`).
+
+---
+
 ## Admin Features
 
 ### User Account Banning

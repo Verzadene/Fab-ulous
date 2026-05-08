@@ -21,7 +21,8 @@ Community platform for sharing software and hardware projects in one space. The 
 | Friendships | ✅ Complete | `post/friends.php` |
 | Direct messaging | ✅ Complete | `post/messages.php`, `post/messages_api.php` |
 | Notifications | ✅ Complete | `post/notifications.php` |
-| Commissions (submit + status tracking) | ✅ Complete | `post/commissions.php` |
+| Commissions — client submission & personal tracking | ✅ Complete | `post/commissions.php` |
+| Commissions — admin fulfillment (all requests, status, notes, amounts) | ✅ Complete | `admin/admin.php` (Commissions tab), `admin/commission_update.php` |
 | PayMongo payment checkout | ✅ Complete | `post/paymongo_checkout.php`, `post/paymongo_webhook.php` |
 | Profile management | ✅ Complete | `profile/profile.php` |
 | Admin dashboard (users, posts, commissions, audit log) | ✅ Complete | `admin/admin.php`, `admin/commission_update.php` |
@@ -33,7 +34,7 @@ Community platform for sharing software and hardware projects in one space. The 
 ```text
 Fab-ulous/
 ├── admin/                        # Admin-only pages and tools
-│   ├── admin.php                 # Main admin dashboard (user mgmt, commissions, audit log)
+│   ├── admin.php                 # Main admin dashboard (user mgmt, commissions fulfillment, audit log)
 │   ├── admin_login.php           # Admin credential + MFA entry point; redirects authenticated users to their dashboard
 │   ├── admin_logout.php          # Session teardown for admin: writes audit log → destroys session → landing
 │   ├── admin_login.css           # Admin login standalone styles
@@ -99,7 +100,7 @@ Fab-ulous/
 │   ├── NotificationRepository.php# DB abstraction: Notification operations
 │   ├── CommissionRepository.php  # DB abstraction: Commission requests and updates
 │   ├── PaymentRepository.php     # DB abstraction: PayMongo payment lifecycle (pending → checkout → paid)
-│   ├── commissions.php           # Commission submit (users) + status management (admins)
+│   ├── commissions.php           # Commission submit (any role) + personal request tracking — client-facing only
 │   ├── commissions.css
 │   ├── paymongo_checkout.php     # POST handler: create PayMongo checkout session; redirect to payment URL
 │   └── paymongo_webhook.php      # POST handler: receive PayMongo webhook; update commission_payments
@@ -524,7 +525,8 @@ http://localhost/Fab-ulous/landing/landing.html
 | `register/verify_registration.php` | None | Email verification for new accounts |
 | `post/post.php` | user + mfa_verified | Main social feed |
 | `post/messages.php` | user + mfa_verified | Direct messaging |
-| `post/commissions.php` | user + mfa_verified | Submit/track commissions (admin sees all) |
+| `post/commissions.php` | user + mfa_verified | Submit a commission request; track **own** commissions only (all roles — users, admins, super admins — see only their personal submissions here) |
+| `admin/admin.php` → Commissions tab | admin + mfa_verified | Global commission management: all platform requests, status updates, admin notes, amount setting, file access. Self-submitted commissions are locked — another admin must action them (no self-approval). |
 | `profile/profile.php` | user + mfa_verified | Account settings, password, profile pic |
 | `admin/admin_login.php` | None (admin creds) | Admin sign-in |
 | `admin/admin.php` | admin + mfa_verified | Admin dashboard |
@@ -560,7 +562,8 @@ http://localhost/Fab-ulous/landing/landing.html
 | `post/edit_post.php` | POST | Edit post caption (owner only) | `post/post.php` JS |
 | `post/delete_post.php` | POST | Delete post (owner only) | `post/post.php` JS |
 | `post/create_post.php` | POST | Create post with optional image | `post/post.php` |
-| `post/commissions.php` | GET, POST | List commissions (JSON); submit commission (user); update status (admin) | `post/commissions.php` JS |
+| `post/commissions.php` | GET, POST | List **own** commissions as JSON (always user-scoped, any role); submit new commission | `post/commissions.php` JS |
+| `admin/commission_update.php` | POST | Update commission status, note, and amount from admin dashboard; enforces no-self-approval rule server-side | `admin/admin.php` JS |
 | `post/paymongo_checkout.php` | POST | Create PayMongo checkout session (delegates to `PaymentRepository`) | `post/commissions.php` JS |
 | `post/paymongo_webhook.php` | POST | Receive PayMongo webhook; idempotently mark paid via `PaymentRepository` and fire `commission_paid` notification | PayMongo servers |
 | `admin/commission_update.php` | POST | Update commission from admin dashboard | `admin/admin.php` |
