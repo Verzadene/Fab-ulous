@@ -414,9 +414,9 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
     <!-- ── COMMISSIONS TAB ── -->
     <div id="tab-commissions" class="tab-content">
       <h2 class="section-heading">Commission Management</h2>
-      
+
       <div class="admin-filters">
-        <input type="text" id="filterCommText" placeholder="Search requester, title, description..." oninput="filterCommissions()" style="flex: 1; min-width: 200px;">
+        <input type="text" id="filterCommText" placeholder="Search requester, title, description, status…" oninput="filterCommissions()" style="flex: 1; min-width: 200px;">
         <input type="date" id="filterCommStart" onchange="filterCommissions()" title="Start Date">
         <input type="date" id="filterCommEnd" onchange="filterCommissions()" title="End Date">
       </div>
@@ -425,23 +425,58 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
         <table class="admin-table commissions-table" id="commTable">
           <thead>
             <tr>
-              <th>S/N</th><th>ID</th><th>Requester</th><th>Email</th><th>Title</th><th>Description</th>
-              <th>Amount</th><th>Status</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
+              <th>S/N</th><th>ID</th><th>Username</th><th>Full Name</th><th>Email</th><th>Title</th><th>Description</th>
+              <th>Amount</th><th>Status</th><th>File</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($commissions)): ?>
-              <tr class="empty-row"><td colspan="11" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+              <tr class="empty-row"><td colspan="14" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
             <?php else: ?>
               <?php $commRowNum = 1; foreach ($commissions as $c): ?>
                 <?php
-                  $searchString = htmlspecialchars(strtolower(($c['requester'] ?? '') . ' ' . ($c['title'] ?? '') . ' ' . ($c['description'] ?? '')));
+                  // Self-approval guard: an admin who submitted this commission cannot modify it.
+                  // Only another admin can change status/note/amount for their own requests.
+                  $commRequesterId  = (int)($c['userID'] ?? 0);
+                  $isSelfCommission = ($commRequesterId === $adminID);
+
+                  $searchString = htmlspecialchars(strtolower(
+                    ($c['requester_username'] ?? '') . ' ' .
+                    ($c['title'] ?? '') . ' ' .
+                    ($c['description'] ?? '') . ' ' .
+                    ($c['status'] ?? '')
+                  ));
                   $dateString = date('Y-m-d', strtotime($c['created_at']));
+
+                  $statusClass   = 'status-badge status-' . strtolower(str_replace(' ', '-', $c['status']));
+                  $amountDisplay = '&#8369;' . number_format((float)($c['amount'] ?? 0), 2);
+                  $amountValue   = number_format((float)($c['amount'] ?? 0), 2, '.', '');
+
+                  $fileHtml = '—';
+                  if (!empty($c['attachment_url'])) {
+                    $fileUrl = htmlspecialchars('../' . $c['attachment_url']);
+                    $fileHtml = '<a href="' . $fileUrl . '" target="_blank" class="action-btn btn-view" title="Open file">&#128196; View</a>';
+                  }
+
+                  $payStatus = $c['payment_status'] ?? '';
+                  if ($payStatus === 'paid') {
+                    $payHtml = '<span class="status-badge status-completed">Paid</span>';
+                  } elseif ($payStatus) {
+                    $payHtml = '<span class="status-badge status-pending">' . htmlspecialchars(ucfirst($payStatus)) . '</span>';
+                  } else {
+                    $payHtml = '<span class="no-action">—</span>';
+                  }
                 ?>
                 <tr data-search="<?php echo $searchString; ?>" data-date="<?php echo $dateString; ?>">
                   <td class="comm-sn"><?php echo $commRowNum++; ?></td>
                   <td>#<?php echo $c['commissionID']; ?></td>
-                  <td><?php echo htmlspecialchars($c['requester'] ?? '—'); ?></td>
+                  <td>
+                    <?php echo htmlspecialchars($c['requester_username'] ?? '—'); ?>
+                    <?php if ($isSelfCommission): ?>
+                      <br><span class="status-badge" style="font-size:0.65rem;margin-top:4px;background:rgba(230,126,34,0.18);color:#e67e22;">Your request</span>
+                    <?php endif; ?>
+                  </td>
+                  <td><?php echo htmlspecialchars($c['requester_name'] ?? '—'); ?></td>
                   <td>
                     <?php if (!empty($c['requester_email'])): ?>
                       <a class="requester-email" href="mailto:<?php echo htmlspecialchars($c['requester_email']); ?>">
@@ -453,39 +488,46 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
                   </td>
                   <td class="caption-cell"><?php echo htmlspecialchars($c['title'] ?? '—'); ?></td>
                   <td class="caption-cell"><?php echo htmlspecialchars(mb_substr($c['description'] ?? '', 0, 60)) . (mb_strlen($c['description'] ?? '') > 60 ? '…' : ''); ?></td>
-                  <td id="commission-amount-display-<?php echo $c['commissionID']; ?>">&#8369;<?php echo number_format((float)($c['amount'] ?? 0), 2); ?></td>
+                  <td id="commission-amount-display-<?php echo $c['commissionID']; ?>"><?php echo $amountDisplay; ?></td>
                   <td>
-                    <span
-                      class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $c['status'])); ?>"
-                      id="commission-status-<?php echo $c['commissionID']; ?>"
-                    >
+                    <span class="<?php echo $statusClass; ?>" id="commission-status-<?php echo $c['commissionID']; ?>">
                       <?php echo htmlspecialchars($c['status']); ?>
                     </span>
                   </td>
+                  <td><?php echo $fileHtml; ?></td>
+                  <td><?php echo $payHtml; ?></td>
                   <td><?php echo date('M d, Y', strtotime($c['created_at'])); ?></td>
                   <td class="caption-cell" id="commission-note-display-<?php echo $c['commissionID']; ?>">
                     <?php echo htmlspecialchars(($c['admin_note'] ?? '') !== '' ? $c['admin_note'] : 'No note yet.'); ?>
                   </td>
                   <td>
-                    <form method="POST" class="commission-form" data-commission-id="<?php echo $c['commissionID']; ?>">
-                      <input type="hidden" name="action"    value="update_commission"/>
-                      <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
-                      <select name="commission_status" class="commission-select">
-                        <?php foreach (['Pending','Accepted','Ongoing','Delayed','Completed','Cancelled'] as $s): ?>
-                          <option value="<?php echo $s; ?>" <?php echo $c['status'] === $s ? 'selected' : ''; ?>><?php echo $s; ?></option>
-                        <?php endforeach; ?>
-                      </select>
-                      <input type="text" name="admin_note" class="commission-note"
-                             value="<?php echo htmlspecialchars($c['admin_note'] ?? ''); ?>"
-                             placeholder="Add a note…" maxlength="500"/>
-                      <label class="commission-amount-label">
-                        Amount
-                        <input type="number" name="amount" class="commission-amount-input"
-                               value="<?php echo htmlspecialchars(number_format((float)($c['amount'] ?? 0), 2, '.', '')); ?>"
-                               min="0" step="0.01"/>
-                      </label>
-                      <button type="submit" class="action-btn btn-save">Save</button>
-                    </form>
+                    <?php if ($isSelfCommission): ?>
+                      <!-- Self-approval prevention: this admin submitted this commission.
+                           Only another admin can approve or modify it. -->
+                      <span class="no-action" title="You cannot modify your own commission request. Another admin must action this.">
+                        &#128274; Self-request
+                      </span>
+                    <?php else: ?>
+                      <form method="POST" class="commission-form" data-commission-id="<?php echo $c['commissionID']; ?>">
+                        <input type="hidden" name="action"    value="update_commission"/>
+                        <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
+                        <select name="commission_status" class="commission-select">
+                          <?php foreach (['Pending','Accepted','Ongoing','Delayed','Completed','Cancelled'] as $s): ?>
+                            <option value="<?php echo $s; ?>" <?php echo $c['status'] === $s ? 'selected' : ''; ?>><?php echo $s; ?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <input type="text" name="admin_note" class="commission-note"
+                               value="<?php echo htmlspecialchars($c['admin_note'] ?? ''); ?>"
+                               placeholder="Add a note…" maxlength="500"/>
+                        <label class="commission-amount-label">
+                          Amount (₱)
+                          <input type="number" name="amount" class="commission-amount-input"
+                                 value="<?php echo htmlspecialchars($amountValue); ?>"
+                                 min="0" step="0.01"/>
+                        </label>
+                        <button type="submit" class="action-btn btn-save">Save</button>
+                      </form>
+                    <?php endif; ?>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -800,10 +842,10 @@ async function saveCommissionForm(form, successMessage) {
     }
 
     const commissionId = form.dataset.commissionId;
-    const statusBadge = document.getElementById('commission-status-' + commissionId);
-    const noteDisplay = document.getElementById('commission-note-display-' + commissionId);
+    const statusBadge  = document.getElementById('commission-status-' + commissionId);
+    const noteDisplay  = document.getElementById('commission-note-display-' + commissionId);
     const amountDisplay = document.getElementById('commission-amount-display-' + commissionId);
-    const noteField = form.querySelector('.commission-note');
+    const noteField    = form.querySelector('.commission-note');
 
     if (statusBadge) {
       statusBadge.className = statusClassName(data.status);
@@ -824,6 +866,8 @@ async function saveCommissionForm(form, successMessage) {
   }
 }
 
+// Wire up commission forms — only non-self-request rows have .commission-form elements.
+// Rows where the admin is the requester render a locked placeholder instead (self-approval prevention).
 document.querySelectorAll('.commission-form').forEach(form => {
   const select = form.querySelector('.commission-select');
 

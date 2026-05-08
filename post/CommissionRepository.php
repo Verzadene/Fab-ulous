@@ -138,6 +138,7 @@ class CommissionRepository {
         if ($isAdmin) {
             $stmt = $connCommissions->prepare(
                 "SELECT c.commissionID,
+                        c.userID,
                         {$titleExpr} AS title,
                         c.description,
                         c.amount,
