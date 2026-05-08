@@ -135,6 +135,15 @@ User login and logout events are now tracked in the `audit_log` table in the `fa
 - **Implementation:** `openBanUserModal()` / `confirmBanUser()` JS in `admin.php`; `processBanUser()` in `AdminRepository.php`.
 - **Unban:** Dedicated Bootstrap modal with green accent. Uses `openUnbanUserModal()` / `confirmUnbanUser()`.
 
+### Post Removal
+- **Location:** Admin Dashboard > Feed Moderator tab
+- **UI:** "Remove" button per post row opens a confirmation modal (`removePostModal`) that clones the red-accented Delete User Account pattern.
+- **Modal:** Warning banner (post ID + owner username + caption preview), mandatory "Reason for Removal" textarea (1000 char limit, required, live character counter), Cancel + "Remove Post" buttons, and a final `confirm()` dialog.
+- **Implementation:** `openRemovePostModal()` / `confirmRemovePost()` JS in `admin.php`; `processDeletePost()` in `AdminRepository.php`.
+- **Email:** `send_post_removal_email()` in `config.php` — notifies the post owner with their post ID, a caption preview, and the admin-typed reason. Email failure does not block removal but is noted in the audit trail.
+- **Audit Logging:** Action string includes post ID, owner username, owner userID, reason, and email delivery status. Target type resolves to `'post'` via `logAuditAction()`.
+- **Cascade:** Likes and comments are deleted before the post record (referential integrity enforced in PHP per the micro-DB architecture).
+
 ### Account Deletion
 - **Location:** Admin Dashboard > User Management tab
 - **UI:** Delete button for eligible users only.
