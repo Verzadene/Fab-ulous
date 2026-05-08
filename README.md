@@ -38,18 +38,21 @@ Fab-ulous/
 │   ├── admin_logout.php          # Session teardown for admin
 │   ├── admin_login.css           # Admin login standalone styles
 │   ├── admin.css                 # Admin dashboard styles
+│   ├── AdminRepository.php       # DB abstraction: user banning, deletion, audit log, commission oversight
 │   └── commission_update.php     # AJAX endpoint: update commission status/notes from dashboard
 │
 ├── config.php                    # Single source of truth — all constants, DB, auth helpers, SMTP
 │
 ├── database/
-│   ├── setup.sql                 # Fresh install: creates all tables from scratch
+│   ├── setup_micro_dbs.sql       # Canonical fresh install: creates all 12 micro-databases and their tables (use this)
+│   ├── setup.sql                 # ⚠️ Deprecated monolith schema — superseded by setup_micro_dbs.sql
+│   ├── migration_messages_canonical.sql # Renames sender_id/receiver_id → senderID/receiverID in messages table (idempotent)
 │   ├── migration_v2.sql          # Adds super_admin role, friendships, notifications, commission fields
 │   ├── migration_v3_mfa.sql      # Adds mfa_code + mfa_code_expires_at to accounts
 │   ├── migration_v4.sql          # Adds profile_pic to accounts; creates pending_registrations
 │   ├── migration_v5.sql          # Expands commission statuses; adds password_resets, messages, audit visibility
 │   ├── migration_v6_paymongo.sql # Creates commission_payments table for PayMongo tracking
-│   └── migration_v7_notifications.sql # Expands notifications.type ENUM for commissions, payments, messages
+│   ├── migration_v7_notifications.sql # Expands notifications.type ENUM for commissions, payments, messages
 │   └── migration_v8_profile_fields.sql # Adds bio column to accounts table
 │
 ├── documentation/
@@ -62,6 +65,9 @@ Fab-ulous/
 │       ├── Green_Logo_Tab.png
 │       └── Green_Logo_Top_left.png
 │
+├── includes/
+│   └── app_nav.php               # Shared top nav + burger drawer + Help offcanvas (included by all authenticated pages)
+│
 ├── landing/
 │   ├── landing.html              # Public-facing landing page
 │   └── landing.css
@@ -69,6 +75,7 @@ Fab-ulous/
 ├── login/
 │   ├── login.php                 # User login: credential check → MFA challenge → verify_mfa.php
 │   ├── login.css                 # Shared auth page styles (used by login, admin login, MFA, forgot-pw, reset-pw)
+│   ├── auth_slider.js            # Shared auth-panel slide animation + bfcache Back-button fix (used by login.php, admin/admin_login.php, register/register.html)
 │   ├── logout.php                # User session teardown → landing
 │   ├── verify_mfa.php            # Email MFA code entry; completes session after correct code
 │   ├── verify_mfa.css            # MFA-specific style overrides
@@ -95,6 +102,7 @@ Fab-ulous/
 │   ├── messages_api.php          # GET/POST API: load conversation history and send messages
 │   ├── PostRepository.php        # DB abstraction: Post data
 │   ├── FriendRepository.php      # DB abstraction: Friendships and requests
+│   ├── InteractionRepository.php # DB abstraction: Likes and comments across posts
 │   ├── MessageRepository.php     # DB abstraction: Messaging operations
 │   ├── NotificationRepository.php# DB abstraction: Notification operations
 │   ├── CommissionRepository.php  # DB abstraction: Commission requests and updates
@@ -106,7 +114,9 @@ Fab-ulous/
 │
 ├── profile/
 │   ├── profile.php               # View and edit account details, change password, upload profile pic
-│   └── profile.css
+│   ├── profile.css
+│   ├── ProfileRepository.php     # DB abstraction: profile reads, updates, password change, pic upload
+│   └── profile_api.php           # GET/POST API: returns or updates profile data as JSON
 │
 ├── register/
 │   ├── register.html             # Registration form UI
