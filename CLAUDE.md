@@ -91,6 +91,39 @@ The three-panel sliding transition between `login.php`, `admin/admin_login.php`,
 ### 9. Uploads & Paths
 Validate MIME type and file size. Ensure target folders exist. Keep relative asset links and local callback URLs compatible with `http://localhost/Fab-ulous/...`.
 
+### 11. Auth Entry Point Redirects
+All entry points that could show a login or registration form must redirect already-authenticated users to their dashboard immediately — no redundant login, no UI inconsistency.
+
+**Rule:** If `$_SESSION['user']` is set AND `$_SESSION['mfa_verified']` is truthy, the visitor has a complete session. They must be sent to `dashboard_path_for_role(role)` regardless of where they came from.
+
+**PHP files** (`login/login.php`, `admin/admin_login.php`): Add the guard at the very top of the file, immediately after `session_start()` + `require_once config.php`. Example:
+```php
+if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
+    header('Location: ' . dashboard_path_for_role($_SESSION['user']['role'] ?? 'user'));
+    exit;
+}
+```
+
+**HTML files** (`landing/landing.html`, `register/register.html`): Cannot run PHP. Use a lightweight JS `fetch` to ping `auth_status.php` (project root) on every page load, then `window.location.replace(data.redirect)` if `data.authenticated` is true. Also attach the same check to the `pageshow` event so it fires correctly on Back-Forward Cache (bfcache) restores.
+
+**`auth_status.php`** (project root): A new, dedicated endpoint that starts the session, checks `$_SESSION['user']` and `$_SESSION['mfa_verified']`, and returns `{"authenticated":true,"redirect":"..."}` or `{"authenticated":false}` as JSON. It requires no input and has no side effects.
+
+### 12. Audit Log: Login & Logout Events
+User login and logout events are now tracked in the `audit_log` table in the `fab_ulous_audit_log` database.
+
+**Login** is recorded inside `login/verify_mfa.php` immediately after `begin_user_session()` succeeds and before the `header('Location: ...')` redirect. The Google OAuth path (`oauth/oauth2callback.php`) calls `begin_user_session()` directly and can be updated the same way if login tracking via Google is required.
+
+**Logout** is recorded inside `login/logout.php` and `admin/admin_logout.php` **before** `session_destroy()` while the user identity is still available in `$_SESSION['user']`.
+
+**Schema compatibility:** Both events reuse the existing `audit_log` columns without any schema change:
+- `admin_id` / `target_id` → the logging user's own `id`
+- `admin_username` → the logging user's `username`
+- `action` → `'User Login'` or `'User Logout'` (string)
+- `target_type` → `'account'`
+- `visibility_role` → `'admin'` (visible to all admins and super_admins)
+
+**Filter compatibility:** Because `admin_username`, `action`, `first_name`, and `last_name` are all columns already included in `AdminRepository::searchAuditLogs()`, the existing search bar (Username / First Name / Last Name) and time filter (8 hrs, 24 hrs, etc.) cover these new events with no additional code.
+
 ---
 
 ## Admin Features
