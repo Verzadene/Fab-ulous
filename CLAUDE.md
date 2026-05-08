@@ -15,7 +15,7 @@
 - App root: `C:\xampp\htdocs\Fab-ulous`
 - Landing page: `http://localhost/Fab-ulous/landing/landing.html`
 - Google callback: `http://localhost/Fab-ulous/oauth/oauth2callback.php`
-- **Database setup:** Run `database/setup_micro_dbs.sql` to create all 12 databases. The old `setup.sql` and migration files are deprecated.
+- **Database setup:** Run `database/setup_micro_dbs.sql` to create all 12 databases.
 - Forgot-password reset codes should only be created and emailed for existing `accounts.email` values.
 - Shared auth page spacing and helper/status styles live in `login/login.css`.
 

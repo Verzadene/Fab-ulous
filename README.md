@@ -45,15 +45,7 @@ Fab-ulous/
 │
 ├── database/
 │   ├── setup_micro_dbs.sql       # Canonical fresh install: creates all 12 micro-databases and their tables (use this)
-│   ├── setup.sql                 # ⚠️ Deprecated monolith schema — superseded by setup_micro_dbs.sql
 │   ├── migration_messages_canonical.sql # Renames sender_id/receiver_id → senderID/receiverID in messages table (idempotent)
-│   ├── migration_v2.sql          # Adds super_admin role, friendships, notifications, commission fields
-│   ├── migration_v3_mfa.sql      # Adds mfa_code + mfa_code_expires_at to accounts
-│   ├── migration_v4.sql          # Adds profile_pic to accounts; creates pending_registrations
-│   ├── migration_v5.sql          # Expands commission statuses; adds password_resets, messages, audit visibility
-│   ├── migration_v6_paymongo.sql # Creates commission_payments table for PayMongo tracking
-│   ├── migration_v7_notifications.sql # Expands notifications.type ENUM for commissions, payments, messages
-│   └── migration_v8_profile_fields.sql # Adds bio column to accounts table
 │
 ├── documentation/
 │   └── FABulous_ProjectDocs_v0.2.0.docx
@@ -449,7 +441,7 @@ mysql -u root < C:/xampp/htdocs/Fab-ulous/database/setup_micro_dbs.sql
 mysql -u root < C:/xampp/htdocs/Fab-ulous/database/migration_messages_canonical.sql
 ```
 
-This creates all 12 databases and their tables from scratch. The old `setup.sql` and `migration_v*.sql` files are **deprecated** — do not run them on a fresh install. The `migration_messages_canonical.sql` script is only needed when upgrading a database that predates the messages column rename; it checks `information_schema` and skips when columns are already canonical.
+This creates all 12 databases and their tables from scratch. The `migration_messages_canonical.sql` script is only needed when upgrading a database that predates the messages column rename; it checks `information_schema` and skips when columns are already canonical.
 
 ### 4. Configure local credentials via `config.local.php`
 
