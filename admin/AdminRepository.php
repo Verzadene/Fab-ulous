@@ -401,7 +401,8 @@ class AdminRepository
             $sql .= " AND al.visibility_role = 'admin'";
         }
 
-        if ($searchTerm !== '') {
+        $hasSearch = ($searchTerm !== '');
+        if ($hasSearch) {
             $sql .= " AND (al.admin_username LIKE ? OR al.action LIKE ? OR a.first_name LIKE ? OR a.last_name LIKE ?)";
             $searchTerm = '%' . $searchTerm . '%';
             $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
@@ -411,7 +412,7 @@ class AdminRepository
         $sql .= " ORDER BY al.created_at DESC";
 
         $stmt = $connAudit->prepare($sql);
-        if ($searchTerm !== '') {
+        if ($hasSearch) {
             $stmt->bind_param($types, ...$params);
         } else {
             $stmt->bind_param($types, $params[0]);

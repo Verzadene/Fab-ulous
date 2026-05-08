@@ -2,10 +2,16 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
-if (isset($_SESSION['user']) && in_array($_SESSION['user']['role'] ?? '', ['admin', 'super_admin'], true)) {
-    header('Location: admin.php');
+// ── AUTH GUARD ─────────────────────────────────────────────────────────────
+// Any fully-authenticated user (admin or regular) who already has an active,
+// MFA-verified session should never land on a login form.
+// Admins   → their admin dashboard
+// Users    → post.php (their normal dashboard)
+if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
+    header('Location: ' . dashboard_path_for_role($_SESSION['user']['role'] ?? 'user'));
     exit;
 }
+// ───────────────────────────────────────────────────────────────────────────
 
 $connAccounts = db_connect('accounts'); // Connect to the accounts database
 
@@ -31,12 +37,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user['banned']) {
                 $error = 'This admin account has been suspended.';
             } else {
-                if (!accounts_support_mfa()) { // No longer takes $conn
+                if (!accounts_support_mfa()) {
                     $error = 'MFA is not ready yet. Run the SQL update for the accounts table first.';
                 } else {
                     $code = (string) random_int(100000, 999999);
 
-                    if (!store_mfa_code((int) $user['id'], $code)) { // No longer takes $conn
+                    if (!store_mfa_code((int) $user['id'], $code)) {
                         $error = 'We could not start MFA verification. Please try again.';
                     } else {
                         clear_login_lockout($lockoutBucket);
@@ -61,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         if (!$mailSent) {
                             clear_pending_auth();
-                            clear_mfa_code((int) $user['id']); // No longer takes $conn
+                            clear_mfa_code((int) $user['id']);
                             $error = get_last_mail_error() ?: 'A verification code could not be sent to this admin email address.';
                         } else {
                             header('Location: ../login/verify_mfa.php');

@@ -2,6 +2,15 @@
 session_start();
 require_once __DIR__ . '/../config.php';
 
+// ── AUTH GUARD ─────────────────────────────────────────────────────────────
+// If the user already has an active, MFA-verified session send them straight
+// to their dashboard — they have no reason to see the login form again.
+if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
+    header('Location: ' . dashboard_path_for_role($_SESSION['user']['role'] ?? 'user'));
+    exit;
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 $lockoutBucket = 'fab_global_login';
 $lockoutRemaining = login_lockout_remaining($lockoutBucket);
 
@@ -273,8 +282,6 @@ $isLocked = $lockoutRemaining > 0;
     })();
 
     // Auth slider animation + bfcache fix — see login/auth_slider.js
-    // (loaded below; init called after DOMContentLoaded is not needed
-    //  because auth_slider.js uses pageshow which fires on every display)
   </script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="auth_slider.js"></script>

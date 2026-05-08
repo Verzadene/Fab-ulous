@@ -76,6 +76,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
         } else {
             clear_mfa_code((int) $account['id']);
             begin_user_session($account, true, 'password');
+
+            // ── AUDIT LOG: User Login ──────────────────────────────────────
+            // Session is now active — log the successful login event.
+            $loginUserId   = (int) $account['id'];
+            $loginUsername = (string) $account['username'];
+            try {
+                $connAudit = db_connect('audit_log');
+                $logStmt = $connAudit->prepare(
+                    "INSERT INTO audit_log
+                        (admin_id, admin_username, action, target_type, target_id, visibility_role)
+                     VALUES
+                        (?, ?, 'User Login', 'account', ?, 'admin')"
+                );
+                if ($logStmt) {
+                    $logStmt->bind_param('isi', $loginUserId, $loginUsername, $loginUserId);
+                    $logStmt->execute();
+                    $logStmt->close();
+                }
+            } catch (Throwable $e) {
+                // Audit failure must never block login
+                error_log('FABulous audit login error: ' . $e->getMessage());
+            }
+            // ──────────────────────────────────────────────────────────────
+
             header('Location: ' . dashboard_path_for_role($account['role'] ?? 'user'));
             exit;
         }

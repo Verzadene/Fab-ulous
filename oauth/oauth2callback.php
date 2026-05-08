@@ -114,5 +114,27 @@ begin_user_session([
     'google_id' => $existing['google_id'] ?? $googleId,
 ], true, 'google');
 
+// ── AUDIT LOG: User Login via Google OAuth ────────────────────────────────
+$auditUserId   = (int) $existing['id'];
+$auditUsername = (string) $existing['username'];
+try {
+    $connAudit = db_connect('audit_log');
+    $logStmt = $connAudit->prepare(
+        "INSERT INTO audit_log
+            (admin_id, admin_username, action, target_type, target_id, visibility_role)
+         VALUES
+            (?, ?, 'User Login via Google OAuth', 'account', ?, 'admin')"
+    );
+    if ($logStmt) {
+        $logStmt->bind_param('isi', $auditUserId, $auditUsername, $auditUserId);
+        $logStmt->execute();
+        $logStmt->close();
+    }
+} catch (Throwable $e) {
+    // Audit failure must never block login
+    error_log('FABulous audit google-login error: ' . $e->getMessage());
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 header('Location: ' . dashboard_path_for_role($existing['role'] ?? 'user'));
 exit;
