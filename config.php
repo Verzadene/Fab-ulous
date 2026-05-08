@@ -630,3 +630,32 @@ function send_account_deletion_email(string $email, string $displayName, string 
 
     return send_smtp_mail($email, $displayName, $subject, $message);
 }
+
+/**
+ * Sends an email to a post owner notifying them that an admin removed their post.
+ *
+ * @param string $email        The post owner's email address.
+ * @param string $displayName  The post owner's display name.
+ * @param int    $postId       The ID of the removed post.
+ * @param string $captionPreview A short excerpt of the post caption for context.
+ * @param string $reason       The admin-provided reason for removal.
+ * @return bool True if the email was sent, false otherwise.
+ */
+function send_post_removal_email(string $email, string $displayName, int $postId, string $captionPreview, string $reason): bool
+{
+    $subject = 'Your FABulous Post Has Been Removed';
+    $preview = $captionPreview !== ''
+        ? "Post caption preview:\n\"" . mb_substr($captionPreview, 0, 200) . (mb_strlen($captionPreview) > 200 ? '…' : '') . "\"\n\n"
+        : '';
+    $message = "Hello {$displayName},\n\n"
+        . "We are writing to inform you that your post (Post ID: #{$postId}) has been removed by a FABulous administrator.\n\n"
+        . $preview
+        . "Reason for removal:\n"
+        . "─────────────────────────────────────\n"
+        . $reason . "\n"
+        . "─────────────────────────────────────\n\n"
+        . "If you believe this was done in error or have questions, please contact our support team.\n\n"
+        . "FABulous Moderation Team";
+
+    return send_smtp_mail($email, $displayName, $subject, $message);
+}
