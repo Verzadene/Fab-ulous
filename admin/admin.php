@@ -38,7 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $deletionReason = $_POST['deletion_reason'] ?? '';
         $actionMsg = $adminRepo->processDeleteUser($targetID, $adminID, $adminUsername, $deletionReason, $isSuperAdmin);
     } elseif ($action === 'delete_post' && $targetID) {
-        $actionMsg = $adminRepo->processDeletePost($targetID, $adminID, $adminUsername);
+        $removalReason = trim($_POST['removal_reason'] ?? '');
+        $actionMsg = $adminRepo->processDeletePost($targetID, $removalReason, $adminID, $adminUsername);
     } elseif ($action === 'promote_to_admin' && $targetID && $isSuperAdmin) {
         $actionMsg = $adminRepo->processPromoteToAdmin($targetID, $adminID, $adminUsername);
     } elseif ($action === 'demote_to_user' && $targetID && $isSuperAdmin) {
@@ -395,12 +396,12 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
                   <td><?php echo $p['comments']; ?></td>
                   <td><?php echo date('M d, Y', strtotime($p['created_at'])); ?></td>
                   <td>
-                    <form method="POST" style="display:inline;">
-                      <input type="hidden" name="action"    value="delete_post"/>
-                      <input type="hidden" name="target_id" value="<?php echo $p['postID']; ?>"/>
-                      <button type="submit" class="action-btn btn-ban"
-                              onclick="return confirmDeletePost(this, <?php echo (int)$p['postID']; ?>, <?php echo htmlspecialchars(json_encode(mb_substr($p['caption'] ?? '', 0, 200)), ENT_QUOTES); ?>)">Remove</button>
-                    </form>
+                    <button type="button" class="action-btn btn-ban"
+                            onclick="openRemovePostModal(
+                              <?php echo (int)$p['postID']; ?>,
+                              <?php echo htmlspecialchars(json_encode($p['username']), ENT_QUOTES); ?>,
+                              <?php echo htmlspecialchars(json_encode(mb_substr($p['caption'] ?? '', 0, 200)), ENT_QUOTES); ?>
+                            )">Remove</button>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -501,9 +502,59 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
 </div>
 
 <script>
-function confirmDeletePost(btn, postId, caption) {
-  const preview = caption ? '\n\nCaption preview:\n"' + caption.substring(0, 120) + (caption.length > 120 ? '…' : '') + '"' : '';
-  return confirm('Remove post #' + postId + ' permanently?' + preview);
+// ── Remove Post Modal ────────────────────────────────────────────
+let removePostModal;
+
+function openRemovePostModal(postId, username, caption) {
+  const info = document.getElementById('removePostInfo');
+  let html = `Post <strong>#${postId}</strong> by <strong>${escapeHtml(username)}</strong>`;
+  if (caption && caption.trim() !== '') {
+    const preview = caption.length > 120 ? caption.substring(0, 120) + '…' : caption;
+    html += `<br><small class="text-muted" style="font-style:italic;">&ldquo;${escapeHtml(preview)}&rdquo;</small>`;
+  }
+  info.innerHTML = html;
+
+  document.getElementById('removePostId').value = postId;
+  document.getElementById('removalReasonTextarea').value = '';
+  document.getElementById('removalCharCount').textContent = '0';
+
+  removePostModal = new bootstrap.Modal(document.getElementById('removePostModal'));
+  removePostModal.show();
+}
+
+function confirmRemovePost() {
+  const reason = document.getElementById('removalReasonTextarea').value.trim();
+  if (!reason) {
+    alert('Please provide a reason for removing this post.');
+    return;
+  }
+  if (!confirm('Are you sure you want to permanently remove this post? The post owner will be notified by email.')) {
+    return;
+  }
+  document.getElementById('removePostForm').submit();
+}
+
+function submitRemovePostForm(event) {
+  event.preventDefault();
+  confirmRemovePost();
+}
+
+// Character counter for removal reason — deferred so the modal HTML exists in the DOM
+document.addEventListener('DOMContentLoaded', function () {
+  const removalTextarea = document.getElementById('removalReasonTextarea');
+  if (removalTextarea) {
+    removalTextarea.addEventListener('input', function () {
+      document.getElementById('removalCharCount').textContent = this.value.length;
+    });
+  }
+});
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function switchTab(name, btn) {
@@ -886,6 +937,53 @@ new Chart(document.getElementById('pipelineChart').getContext('2d'), {
       <div class="modal-footer delete-modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn unban-modal-confirm-btn" onclick="confirmUnbanUser()">Restore Access</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Remove Post Modal ── -->
+<div id="removePostModal" class="modal fade" tabindex="-1" aria-labelledby="removePostModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content delete-modal-content">
+      <div class="modal-header delete-modal-header">
+        <h5 class="modal-title" id="removePostModalLabel">Remove Post</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body delete-modal-body">
+        <div class="delete-warning">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <h6>Remove Post Permanently</h6>
+          <p id="removePostInfo" class="delete-user-info"></p>
+        </div>
+        <form id="removePostForm" method="POST" onsubmit="submitRemovePostForm(event)">
+          <input type="hidden" name="action" value="delete_post"/>
+          <input type="hidden" name="target_id" id="removePostId" value=""/>
+
+          <div class="form-group">
+            <label for="removalReasonTextarea" class="form-label">Reason for Removal</label>
+            <p class="form-text">Inform the post owner why their post is being removed. This message will be sent to their email.</p>
+            <textarea
+              id="removalReasonTextarea"
+              name="removal_reason"
+              class="form-control deletion-reason-textarea"
+              placeholder="e.g., Violation of community guidelines, Inappropriate content, Spam..."
+              rows="5"
+              maxlength="1000"
+              required></textarea>
+            <div class="reason-char-count">
+              <span id="removalCharCount">0</span>/1000 characters
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer delete-modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmRemovePost()">Remove Post</button>
       </div>
     </div>
   </div>

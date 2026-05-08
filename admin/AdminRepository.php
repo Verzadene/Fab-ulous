@@ -293,7 +293,7 @@ class AdminRepository
 
         $stmt = $connPosts->prepare(
             "SELECT p.postID, p.userID, p.caption, p.image_url, p.created_at,
-                    a.username,
+                    a.username, a.email,
                     (SELECT COUNT(*) FROM `{$dbLikes}`.likes WHERE postID = p.postID) AS likes,
                     (SELECT COUNT(*) FROM `{$dbComments}`.comments WHERE postID = p.postID) AS comments
              FROM posts p
@@ -306,35 +306,86 @@ class AdminRepository
         return $posts;
     }
 
-    public function processDeletePost(int $postId, int $adminId, string $adminUsername): string
+    /**
+     * Removes a post and all associated data (likes, comments), emails the post owner,
+     * and writes a detailed audit log entry.
+     *
+     * @param int    $postId        The ID of the post to remove.
+     * @param string $removalReason The admin-provided reason for removal.
+     * @param int    $adminId       The ID of the acting admin.
+     * @param string $adminUsername The username of the acting admin.
+     * @return string Human-readable result message.
+     */
+    public function processDeletePost(int $postId, string $removalReason, int $adminId, string $adminUsername): string
     {
-        // Delete from likes
+        // 1. Fetch post details (caption + owner ID) before deletion
+        $connPosts = $this->getConnection('posts');
+        $stmt = $connPosts->prepare("SELECT userID, caption FROM posts WHERE postID = ? LIMIT 1");
+        $stmt->bind_param('i', $postId);
+        $stmt->execute();
+        $postRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (!$postRow) {
+            return "Failed to remove post #{$postId}: post not found.";
+        }
+
+        $postOwnerId = (int)$postRow['userID'];
+        $captionPreview = mb_substr($postRow['caption'] ?? '', 0, 200);
+
+        // 2. Fetch post owner's account details for the email
+        $connAccounts = $this->getConnection('accounts');
+        $stmt = $connAccounts->prepare("SELECT email, first_name, last_name, username FROM accounts WHERE id = ? LIMIT 1");
+        $stmt->bind_param('i', $postOwnerId);
+        $stmt->execute();
+        $ownerRow = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        $ownerEmail    = $ownerRow['email']    ?? '';
+        $ownerUsername = $ownerRow['username'] ?? "user #{$postOwnerId}";
+        $ownerName     = trim(($ownerRow['first_name'] ?? '') . ' ' . ($ownerRow['last_name'] ?? ''));
+        if ($ownerName === '') {
+            $ownerName = $ownerUsername;
+        }
+
+        // 3. Cascade-delete likes, comments, then the post itself
         $connLikes = $this->getConnection('likes');
         $stmt = $connLikes->prepare("DELETE FROM likes WHERE postID = ?");
         $stmt->bind_param('i', $postId);
         $stmt->execute();
         $stmt->close();
 
-        // Delete from comments
         $connComments = $this->getConnection('comments');
         $stmt = $connComments->prepare("DELETE FROM comments WHERE postID = ?");
         $stmt->bind_param('i', $postId);
         $stmt->execute();
         $stmt->close();
 
-        // Delete from posts
-        $connPosts = $this->getConnection('posts');
         $stmt = $connPosts->prepare("DELETE FROM posts WHERE postID = ?");
         $stmt->bind_param('i', $postId);
         $stmt->execute();
         $affected = $stmt->affected_rows;
         $stmt->close();
 
-        if ($affected > 0) {
-            $this->logAuditAction($adminId, $adminUsername, "Deleted post ID {$postId}.", $postId, 'admin');
-            return "Post ID {$postId} deleted.";
+        if ($affected === 0) {
+            return "Failed to remove post #{$postId} (already gone).";
         }
-        return "Failed to delete post ID {$postId} (not found).";
+
+        // 4. Email the post owner (non-blocking — failure is noted in the audit log)
+        $emailLog = '';
+        if ($ownerEmail !== '') {
+            $mailSent = send_post_removal_email($ownerEmail, $ownerName, $postId, $captionPreview, $removalReason);
+            $emailLog = $mailSent ? ' Email sent to owner.' : ' Email failed: ' . get_last_mail_error();
+        } else {
+            $emailLog = ' Owner email not found — no notification sent.';
+        }
+
+        // 5. Audit log
+        $auditAction = "Removed post #{$postId} owned by '{$ownerUsername}' (userID: {$postOwnerId})."
+            . " Reason: '{$removalReason}'." . $emailLog;
+        $this->logAuditAction($adminId, $adminUsername, $auditAction, $postId, 'admin');
+
+        return "Post #{$postId} removed successfully.{$emailLog}";
     }
 
     // ──────────────────────────────────────────────────────────────────────────
