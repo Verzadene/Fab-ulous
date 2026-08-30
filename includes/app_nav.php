@@ -9,6 +9,9 @@ $navUsername = $username ?? ($currentUser['username'] ?? '');
 $navAvatarUrl = $myAvatarUrl ?? (function_exists('get_current_user_avatar') ? get_current_user_avatar() : null);
 $navRole = $role ?? ($currentUser['role'] ?? 'user');
 $navIsAdmin = $isAdmin ?? in_array($navRole, ['admin', 'super_admin'], true);
+// Feed-scope toggle (Public / Friends Only) is opt-in per page via $navShowFeedScope.
+// Only post/post.php sets this. Available to every role (user, admin, super_admin).
+$navShowFeedScope = $navShowFeedScope ?? false;
 
 $navItems = [
     ['key' => 'feed', 'label' => 'News Feed', 'href' => $navRoot . 'post/post.php'],
@@ -44,6 +47,26 @@ $navItems = [
 
 <nav class="topnav">
   <img src="<?php echo htmlspecialchars($navRoot . 'images/Top_Left_Nav_Logo.png'); ?>" alt="FABulous Logo" class="nav-logo"/>
+  <?php if ($navShowFeedScope): ?>
+    <div class="feed-scope-toggle" role="tablist" aria-label="Feed visibility">
+      <button
+        type="button"
+        class="feed-scope-btn active"
+        id="feedScopeFriendsBtn"
+        role="tab"
+        aria-selected="true"
+        onclick="setFeedScope('friends')"
+      ><span class="feed-scope-label">Friends Only</span></button>
+      <button
+        type="button"
+        class="feed-scope-btn"
+        id="feedScopePublicBtn"
+        role="tab"
+        aria-selected="false"
+        onclick="setFeedScope('public')"
+      ><span class="feed-scope-label">Public</span></button>
+    </div>
+  <?php endif; ?>
   <div class="topnav-actions">
     <button
       type="button"
@@ -122,9 +145,21 @@ $navItems = [
         </div>
         <div class="help-menu-text">
           <span class="help-menu-label">Community (from Friends)</span>
-          <span class="help-menu-desc">Your News Feed shows posts only from people you're friends with. Keeping your feed personal and relevant. Use the "Find People" search in the right panel to connect with other makers, send friend requests, and grow your community.</span>
+          <span class="help-menu-desc">By default, your News Feed shows posts only from people you're friends with, keeping it personal and relevant. Use the "Find People" search in the right panel to connect with other makers, send friend requests, and grow your community.</span>
         </div>
       </div>
+
+      <?php if ($navShowFeedScope): ?>
+      <div class="help-menu-item">
+        <div class="help-menu-icon help-icon-community">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div class="help-menu-text">
+          <span class="help-menu-label">Public / Friends Only Toggle</span>
+          <span class="help-menu-desc">The pill switch in the top-left of the navigation bar lets you flip your feed view between <strong>Friends Only</strong> (default) and <strong>Public</strong> (every post any user has chosen to share publicly, whether or not you're friends). When creating a post, choose "Friends Only" or "Public" to control who can see it. Works the same way for users, admins, and super admins.</span>
+        </div>
+      </div>
+      <?php endif; ?>
 
       <div class="help-menu-item">
         <div class="help-menu-icon help-icon-settings">
@@ -140,7 +175,7 @@ $navItems = [
 
     <div class="help-tip-box">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>Your feed is <strong>friends-only</strong>. Add friends first to see posts from others!</span>
+      <span>Your feed is <strong>friends-only by default</strong>. Add friends to see more, or switch to the <strong>Public</strong> tab to browse posts shared with everyone.</span>
     </div>
   </div>
 </div>

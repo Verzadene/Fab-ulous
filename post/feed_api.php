@@ -11,9 +11,10 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 }
 
 $userID = (int)$_SESSION['user']['id'];
+$scope  = ($_GET['scope'] ?? 'friends') === 'public' ? 'public' : 'friends';
 
 $postRepo = new PostRepository('db_connect');
-$posts = $postRepo->getFeed($userID);
+$posts = $postRepo->getFeed($userID, 20, $scope);
 
 echo json_encode(['status' => 'success', 'data' => ['posts' => $posts]]);
 ?>

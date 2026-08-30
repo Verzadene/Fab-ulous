@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS `posts` (
   `userID` int(11) NOT NULL,
   `caption` text DEFAULT NULL,
   `image_url` varchar(255) DEFAULT NULL,
+  `visibility` enum('public','friends') NOT NULL DEFAULT 'friends', -- 'friends' = visible only to accepted friends (+ self); 'public' = visible platform-wide via the Public feed tab
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`postID`),
   KEY `userID` (`userID`) -- Originally a FOREIGN KEY to fab_ulous_accounts.accounts(id). Integrity is now handled by the application.

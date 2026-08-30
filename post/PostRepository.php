@@ -30,16 +30,54 @@ class PostRepository {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Fetches the main social feed for a user (own posts + accepted friends' posts).
+     * Fetches the social feed for a user.
      *
-     * Step 1: Fetch accepted friend IDs from the friendships DB.
+     * Two scopes:
+     *   - 'friends' (default): own posts + accepted friends' posts, regardless of
+     *     each post's `visibility` value. This is the original friends-only feed
+     *     and its behaviour is unchanged.
+     *   - 'public': own posts + ANY post platform-wide where `visibility = 'public'`,
+     *     independent of friendship. Lets a post's author opt in to sitewide reach
+     *     without changing what friends-scope viewers see.
+     *
+     * Step 1 (friends scope only): Fetch accepted friend IDs from the friendships DB.
      * Step 2: Fetch posts from the posts DB, using fully-qualified names for the
      *         cross-database subqueries (accounts, likes, comments).
      */
-    public function getFeed(int $userID, int $limit = 20): array {
-        $connFriendships = $this->getConnection('friendships');
+    public function getFeed(int $userID, int $limit = 20, string $scope = 'friends'): array {
+        $scope = ($scope === 'public') ? 'public' : 'friends';
 
-        // Step 1 — collect allowed author IDs (self + accepted friends)
+        $connPosts   = $this->getConnection('posts');
+        $dbAccounts  = DB_CONFIG['accounts']['name'];
+        $dbLikes     = DB_CONFIG['likes']['name'];
+        $dbComments  = DB_CONFIG['comments']['name'];
+
+        $selectCols = "p.postID, p.caption, p.image_url, p.visibility, p.created_at,
+                       a.id AS authorID, a.username AS author, a.profile_pic AS author_pic, a.bio AS author_bio,
+                       (SELECT COUNT(*) FROM `{$dbLikes}`.likes WHERE postID = p.postID) AS like_count,
+                       (SELECT COUNT(*) FROM `{$dbComments}`.comments WHERE postID = p.postID) AS comment_count,
+                       EXISTS(SELECT 1 FROM `{$dbLikes}`.likes WHERE postID = p.postID AND userID = ?) AS user_liked";
+
+        if ($scope === 'public') {
+            // Public scope — own posts + any post marked public, sitewide, no friendship check.
+            $sql = "SELECT {$selectCols}
+                    FROM posts p
+                    JOIN `{$dbAccounts}`.accounts a ON p.userID = a.id
+                    WHERE p.visibility = 'public' OR p.userID = ?
+                    ORDER BY p.created_at DESC
+                    LIMIT ?";
+
+            $stmt = $connPosts->prepare($sql);
+            $stmt->bind_param('iii', $userID, $userID, $limit);
+            $stmt->execute();
+            $posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+
+            return $posts;
+        }
+
+        // Friends scope (default) — Step 1: collect allowed author IDs (self + accepted friends)
+        $connFriendships = $this->getConnection('friendships');
         $allowedUserIDs = [$userID];
 
         $hasFriendships = (bool) $connFriendships->query("SHOW TABLES LIKE 'friendships'")->num_rows;
@@ -60,19 +98,10 @@ class PostRepository {
         }
 
         // Step 2 — fetch posts with cross-DB subqueries using qualified names
-        $connPosts   = $this->getConnection('posts');
-        $dbAccounts  = DB_CONFIG['accounts']['name'];
-        $dbLikes     = DB_CONFIG['likes']['name'];
-        $dbComments  = DB_CONFIG['comments']['name'];
-
         $placeholders = implode(',', array_fill(0, count($allowedUserIDs), '?'));
         $types        = str_repeat('i', count($allowedUserIDs));
 
-        $sql = "SELECT p.postID, p.caption, p.image_url, p.created_at,
-                       a.id AS authorID, a.username AS author, a.profile_pic AS author_pic, a.bio AS author_bio,
-                       (SELECT COUNT(*) FROM `{$dbLikes}`.likes WHERE postID = p.postID) AS like_count,
-                       (SELECT COUNT(*) FROM `{$dbComments}`.comments WHERE postID = p.postID) AS comment_count,
-                       EXISTS(SELECT 1 FROM `{$dbLikes}`.likes WHERE postID = p.postID AND userID = ?) AS user_liked
+        $sql = "SELECT {$selectCols}
                 FROM posts p
                 JOIN `{$dbAccounts}`.accounts a ON p.userID = a.id
                 WHERE p.userID IN ({$placeholders})
@@ -93,8 +122,9 @@ class PostRepository {
     // Posts CRUD
     // ──────────────────────────────────────────────────────────────────────────
 
-    public function processCreatePost(int $userID, string $caption, ?array $imageFile): bool {
+    public function processCreatePost(int $userID, string $caption, ?array $imageFile, string $visibility = 'friends'): bool {
         $imageURL = null;
+        $visibility = ($visibility === 'public') ? 'public' : 'friends';
 
         if ($imageFile && $imageFile['error'] === UPLOAD_ERR_OK) {
             $uploadDir = __DIR__ . '/../uploads/posts/';
@@ -115,13 +145,14 @@ class PostRepository {
             return false;
         }
 
-        return $this->createPost($userID, $caption, $imageURL);
+        return $this->createPost($userID, $caption, $imageURL, $visibility);
     }
 
-    public function createPost(int $userID, string $caption, ?string $imageURL): bool {
+    public function createPost(int $userID, string $caption, ?string $imageURL, string $visibility = 'friends'): bool {
+        $visibility = ($visibility === 'public') ? 'public' : 'friends';
         $connPosts = $this->getConnection('posts');
-        $stmt = $connPosts->prepare("INSERT INTO posts (userID, caption, image_url) VALUES (?, ?, ?)");
-        $stmt->bind_param("iss", $userID, $caption, $imageURL);
+        $stmt = $connPosts->prepare("INSERT INTO posts (userID, caption, image_url, visibility) VALUES (?, ?, ?, ?)");
+        $stmt->bind_param("isss", $userID, $caption, $imageURL, $visibility);
         $ok = $stmt->execute();
         $stmt->close();
         return $ok;

@@ -34,6 +34,7 @@ $myAvatarUrl = get_current_user_avatar();
   <?php
   $navActive = 'feed';
   $navRoot = '../';
+  $navShowFeedScope = true;
   require __DIR__ . '/../includes/app_nav.php';
   ?>
 
@@ -63,6 +64,16 @@ $myAvatarUrl = get_current_user_avatar();
                     <input type="file" name="image" accept="image/*" id="imgInput" onchange="previewImage(this)"/>
                     &#128247; Attach Image (optional)
                   </label>
+                  <div class="visibility-choice" role="radiogroup" aria-label="Who can see this post">
+                    <label class="visibility-option">
+                      <input type="radio" name="visibility" value="friends" checked onchange="updatePreview()"/>
+                      <span class="visibility-option-label">Friends Only</span>
+                    </label>
+                    <label class="visibility-option">
+                      <input type="radio" name="visibility" value="public" onchange="updatePreview()"/>
+                      <span class="visibility-option-label">Public</span>
+                    </label>
+                  </div>
                   <div class="modal-actions">
                     <button type="button" class="modal-btn-discard" onclick="closeModal()">Discard</button>
                     <button type="submit" class="modal-btn-upload">Upload</button>
@@ -84,6 +95,7 @@ $myAvatarUrl = get_current_user_avatar();
                       <?php endif; ?>
                     </div>
                     <p class="preview-author"><?php echo htmlspecialchars($username); ?></p>
+                    <span class="preview-visibility" id="previewVisibility">Friends Only</span>
                   </div>
                   <img id="previewImg" class="preview-img" style="display:none;" alt=""/>
                   <p id="previewCaption" class="preview-caption"></p>
@@ -227,6 +239,10 @@ function previewImage(input) {
 function updatePreview() {
   document.getElementById('previewCaption').textContent =
     document.querySelector('.caption-input').value;
+
+  const selectedVisibility = document.querySelector('input[name="visibility"]:checked')?.value || 'friends';
+  const previewVisibility = document.getElementById('previewVisibility');
+  previewVisibility.textContent = selectedVisibility === 'public' ? 'Public' : 'Friends Only';
 }
 
 function esc(value) {
@@ -307,9 +323,28 @@ async function loadFriendDirectory() {
   }
 }
 
+let currentFeedScope = 'friends';
+
+function setFeedScope(scope) {
+  scope = scope === 'public' ? 'public' : 'friends';
+  if (scope === currentFeedScope) return;
+  currentFeedScope = scope;
+
+  const friendsBtn = document.getElementById('feedScopeFriendsBtn');
+  const publicBtn = document.getElementById('feedScopePublicBtn');
+  if (friendsBtn && publicBtn) {
+    friendsBtn.classList.toggle('active', scope === 'friends');
+    friendsBtn.setAttribute('aria-selected', scope === 'friends' ? 'true' : 'false');
+    publicBtn.classList.toggle('active', scope === 'public');
+    publicBtn.setAttribute('aria-selected', scope === 'public' ? 'true' : 'false');
+  }
+
+  loadFeed();
+}
+
 async function loadFeed() {
   try {
-    const response = await fetch('feed_api.php');
+    const response = await fetch('feed_api.php?scope=' + encodeURIComponent(currentFeedScope));
     const result = await response.json();
     if (result.status === 'success') {
       renderFeed(result.data.posts);
@@ -322,11 +357,10 @@ async function loadFeed() {
 function renderFeed(posts) {
   const container = document.getElementById('feedContainer');
   if (!posts || posts.length === 0) {
-    container.innerHTML = `
-      <div class="empty-feed">
-        <p>No posts from friends yet.</p>
-        <p class="empty-sub">Add friends from the right panel to start building your feed.</p>
-      </div>`;
+    const emptyMessage = currentFeedScope === 'public'
+      ? '<p>No public posts yet.</p><p class="empty-sub">Posts marked "Public" when created will show up here for everyone.</p>'
+      : '<p>No posts from friends yet.</p><p class="empty-sub">Add friends from the right panel to start building your feed.</p>';
+    container.innerHTML = `<div class="empty-feed">${emptyMessage}</div>`;
     return;
   }
   
@@ -350,6 +384,9 @@ function renderFeed(posts) {
     const captionHtml = post.caption ? `<p class="post-caption">${esc(post.caption).replace(/\\n/g, '<br>')}</p>` : '';
     const imgHtml = post.image_url ? `<img src="${esc(post.image_url)}" class="post-image" alt="Post image"/>` : '';
     const bioHtml = post.author_bio ? `<span class="post-bio" style="display:block; font-size:0.85em; opacity:0.8; margin-bottom:2px;">${esc(post.author_bio)}</span>` : '';
+    const visibilityBadge = post.visibility === 'public'
+      ? '<span class="post-visibility-badge public">Public</span>'
+      : '<span class="post-visibility-badge friends">Friends Only</span>';
 
     return `
       <div class="post-card" id="post-${post.postID}">
@@ -358,7 +395,7 @@ function renderFeed(posts) {
           <div class="post-meta">
             <span class="post-author">${esc(post.author)}</span>
             ${bioHtml}
-            <span class="post-time">${dateStr}</span>
+            <span class="post-time">${dateStr} &middot; ${visibilityBadge}</span>
           </div>
           ${ownActions}
         </div>

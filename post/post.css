@@ -1523,3 +1523,126 @@ body.menu-open .hamburger-btn span:nth-child(3) {
     width: 100vw !important;
   }
 }
+/* ── Feed Scope Toggle (Public / Friends Only) — top-left of topnav on the feed page ── */
+.feed-scope-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(120, 214, 140, 0.16);
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.feed-scope-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: rgba(248, 255, 249, 0.72);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.feed-scope-btn:hover {
+  color: var(--text-white);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feed-scope-btn.active {
+  background: var(--green-2);
+  color: var(--text-dark);
+}
+
+/* ── Post visibility choice — Create Post modal ── */
+.visibility-choice {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.visibility-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #f4f7f5;
+  border: 1.5px solid #cad8cf;
+  border-radius: var(--radius-pill);
+  color: #5f6d63;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
+}
+
+.visibility-option input[type="radio"] {
+  accent-color: var(--green-1);
+  margin: 0;
+}
+
+.visibility-option:has(input:checked) {
+  background: var(--green-3);
+  border-color: var(--green-1);
+  color: var(--text-dark);
+}
+
+.preview-visibility {
+  margin-left: auto;
+  padding: 3px 10px;
+  background: var(--green-4);
+  border-radius: var(--radius-pill);
+  color: var(--green-1);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Post visibility badge — feed cards ── */
+.post-visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.post-visibility-badge.public {
+  background: var(--green-4);
+  color: var(--green-1);
+}
+
+.post-visibility-badge.friends {
+  background: #f1f3f1;
+  color: #6b776e;
+}
+
+@media (max-width: 760px) {
+  .feed-scope-label {
+    display: none;
+  }
+
+  .feed-scope-btn {
+    padding: 6px 9px;
+  }
+}
+
+@media (max-width: 420px) {
+  .feed-scope-toggle {
+    gap: 0;
+  }
+
+  .feed-scope-btn {
+    padding: 5px 7px;
+  }
+}
