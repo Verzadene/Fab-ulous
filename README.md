@@ -18,6 +18,7 @@ Community platform for sharing software and hardware projects in one space. The 
 | Email-verified registration | ✅ Complete | `register/register.php`, `register/verify_registration.php` |
 | Forgot-password / reset | ✅ Complete | `login/forgot_password.php`, `login/reset_password.php` |
 | Social posts (create, like, comment) | ✅ Complete | `post/post.php`, `post/create_post.php`, `post/like.php`, `post/comment.php` |
+| Post visibility — Public / Friends Only feed toggle | ✅ Complete | `post/post.php`, `post/feed_api.php`, `post/PostRepository.php`, `includes/app_nav.php` |
 | Friendships | ✅ Complete | `post/friends.php` |
 | Direct messaging | ✅ Complete | `post/messages.php`, `post/messages_api.php` |
 | Notifications | ✅ Complete | `post/notifications.php` |
@@ -47,6 +48,7 @@ Fab-ulous/
 ├── database/
 │   ├── setup_micro_dbs.sql       # Canonical fresh install: creates all 12 micro-databases and their tables (use this)
 │   ├── migration_messages_canonical.sql # Renames sender_id/receiver_id → senderID/receiverID in messages table (idempotent)
+│   ├── migration_posts_visibility.sql # Adds posts.visibility (public/friends) for installs predating the feed toggle (idempotent)
 │
 ├── documentation/
 │   └── FABulous_ProjectDocs_v0.2.0.docx
@@ -59,7 +61,7 @@ Fab-ulous/
 │       └── Green_Logo_Top_left.png
 │
 ├── includes/
-│   └── app_nav.php               # Shared top nav + burger drawer + Help offcanvas (included by all authenticated pages)
+│   └── app_nav.php               # Shared top nav + burger drawer + Help offcanvas + optional Public/Friends Only feed-scope toggle (included by all authenticated pages)
 │
 ├── landing/
 │   ├── landing.html              # Public-facing landing page
@@ -82,8 +84,8 @@ Fab-ulous/
 │   ├── post.php                  # Main authenticated feed (posts, friend actions, notifications)
 │   ├── post.css                  # Feed page styles (also defines topnav for all post/ pages)
 │   ├── post.html                 # Static shell / redirect shim
-│   ├── feed_api.php              # GET: returns main feed as JSON
-│   ├── create_post.php           # POST handler: create post with optional image upload
+│   ├── feed_api.php              # GET: returns feed as JSON; accepts ?scope=public|friends (default friends)
+│   ├── create_post.php           # POST handler: create post with optional image upload and visibility (public/friends)
 │   ├── edit_post.php             # POST handler: edit post caption (owner only)
 │   ├── delete_post.php           # POST handler: delete post (owner only)
 │   ├── like.php                  # POST handler: toggle like; returns updated count as JSON
@@ -262,6 +264,24 @@ Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent). `
 
 ---
 
+## Post Visibility (Public / Friends Only)
+
+Each post carries a `visibility` value (`public` or `friends`, default `friends`) that the author sets at creation time, plus a feed-scope toggle that lets any viewer choose which set of posts to browse.
+
+- **Location:** Create Post modal on `post/post.php` has a Friends Only / Public radio choice (defaults to Friends Only, mirrored live in the post preview). The feed-scope toggle is a pill switch at the **top-left of the topnav**, next to the logo, rendered by `includes/app_nav.php` whenever a page sets `$navShowFeedScope = true` (currently only `post/post.php`).
+- **Friends Only feed (default):** own posts + accepted friends' posts — unchanged from the original feed behavior, regardless of each post's `visibility` value.
+- **Public feed:** own posts + any post platform-wide marked `visibility = 'public'`, independent of friendship. This is a sitewide discovery view that only surfaces posts their authors explicitly opted to share publicly.
+- **Roles:** The toggle and the create-post visibility choice work identically for `user`, `admin`, and `super_admin` — there is no role restriction on either control.
+- **Implementation:**
+  - `PostRepository::getFeed(int $userID, int $limit = 20, string $scope = 'friends')` — branches on `$scope`; the `public` branch never touches the friendships table.
+  - `post/feed_api.php` — accepts `?scope=public|friends` (sanitized server-side, defaults to `friends`).
+  - `PostRepository::createPost()` / `processCreatePost()` — accept a sanitized `visibility` argument (`'public'` or `'friends'`, defaulting to `'friends'`).
+  - `post/create_post.php` — reads and sanitizes `$_POST['visibility']`.
+  - Each post card in the feed shows a small "Public" or "Friends Only" badge.
+- **Database:** `posts.visibility ENUM('public','friends') NOT NULL DEFAULT 'friends'`. Fresh installs get this column from `database/setup_micro_dbs.sql`; existing installs should run `database/migration_posts_visibility.sql` (idempotent — checks `information_schema` first, same pattern as `migration_messages_canonical.sql`).
+
+---
+
 ## Strangler Fig Pattern Migration
 
 FABulous is incrementally transitioning from a monolithic PHP application to microservices using the **Strangler Fig Pattern**. The strategy decouples frontend UI from backend business logic by gradually converting action scripts into RESTful JSON endpoints. Legacy endpoints continue to work during the transition.
@@ -414,6 +434,8 @@ If you are migrating from an older monolithic schema, the following columns were
 
 > **Existing installs:** if your `fab_ulous_messages.messages` table still has `sender_id` / `receiver_id`, run `database/migration_messages_canonical.sql` to rename them in place without losing message history. Idempotent — safe on already-canonical databases.
 
+> **Existing installs:** if your `fab_ulous_posts.posts` table predates the Public/Friends Only feature, run `database/migration_posts_visibility.sql` to add the `visibility` column (defaulting existing rows to `friends`, preserving current behavior). Idempotent — safe on already-migrated databases.
+
 ---
 
 ## Setup
@@ -440,9 +462,14 @@ mysql -u root < C:/xampp/htdocs/Fab-ulous/database/setup_micro_dbs.sql
 # Existing install only — rename legacy messages.sender_id / receiver_id
 # to canonical senderID / receiverID. Idempotent; no-op on fresh installs.
 mysql -u root < C:/xampp/htdocs/Fab-ulous/database/migration_messages_canonical.sql
+
+# Existing install only — add posts.visibility ('public'/'friends') for the feed toggle.
+# Idempotent; no-op on fresh installs (setup_micro_dbs.sql already includes the column).
+mysql -u root < C:/xampp/htdocs/Fab-ulous/database/migration_posts_visibility.sql
 ```
 
 This creates all 12 databases and their tables from scratch. The `migration_messages_canonical.sql` script is only needed when upgrading a database that predates the messages column rename; it checks `information_schema` and skips when columns are already canonical.
+The `migration_posts_visibility.sql` script is only needed when upgrading a database that predates the Public/Friends Only feed toggle; it checks `information_schema` and skips when the `visibility` column is already present.
 
 ### 4. Configure local credentials via `config.local.php`
 
@@ -553,7 +580,7 @@ http://localhost/Fab-ulous/landing/landing.html
 | Endpoint | Method | Purpose | Called by |
 |---|---|---|---|
 | `register/prefill.php` | GET | Return Google OAuth prefill data as JSON | `register/register.js` |
-| `post/feed_api.php` | GET | Fetch the main social feed for the user | `post/post.php` JS |
+| `post/feed_api.php` | GET | Fetch the feed for the user; `?scope=public\|friends` (default `friends`) | `post/post.php` JS |
 | `post/like.php` | POST | Toggle like; return updated count | `post/post.php` |
 | `post/comment.php` | GET, POST | Fetch or add post comments | `post/post.php` |
 | `post/friends.php` | GET, POST | Fetch friend directory; Friendship state machine | `post/post.php` JS |

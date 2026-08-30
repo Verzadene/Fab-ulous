@@ -151,6 +151,27 @@ User registration and Google OAuth sign-in are restricted to a whitelist of appr
 - Domain validation happens **after** all other checks (e.g., password strength, existing user checks) to provide clear, focused error messages.
 - Google OAuth treats unsupported domains as a fatal error — a registration-first message is not shown. If a user attempts Google sign-in with an unsupported domain, they are redirected to login with the error message and cannot proceed to registration.
 
+### 14. Post Visibility & Feed Scope Toggle (Public / Friends Only)
+
+Posts carry a `visibility` column (`fab_ulous_posts`.`posts.visibility`, `ENUM('public','friends')`, default `'friends'`). A top-left pill toggle in the topnav (rendered by `includes/app_nav.php`, gated by `$navShowFeedScope`) lets the viewer switch their feed between:
+
+- **Friends Only** (default) — own posts + accepted friends' posts, regardless of each post's `visibility` value. Unchanged from the original friends-only feed.
+- **Public** — own posts + any post platform-wide where `visibility = 'public'`, independent of friendship.
+
+**Key files:**
+- `database/setup_micro_dbs.sql` — canonical `posts` table now includes `visibility`.
+- `database/migration_posts_visibility.sql` — idempotent `ALTER TABLE` for installs created before this feature (checks `information_schema` first, like `migration_messages_canonical.sql`).
+- `post/PostRepository.php` — `getFeed(int $userID, int $limit = 20, string $scope = 'friends')` takes the new `$scope` param; `createPost()` / `processCreatePost()` take a `$visibility` param (sanitized to `'public'` or `'friends'`, defaulting to `'friends'`).
+- `post/feed_api.php` — reads `?scope=public|friends` from the query string (sanitized server-side; anything else falls back to `friends`).
+- `post/create_post.php` — reads `$_POST['visibility']` (sanitized the same way).
+- `includes/app_nav.php` — renders the Friends Only / Public toggle at the **top-left of the topnav, next to the logo**, only when the including page sets `$navShowFeedScope = true`. Currently only `post/post.php` sets this flag. The toggle has no role restriction — it renders identically for `user`, `admin`, and `super_admin` sessions.
+- `post/post.php` — sets `$navShowFeedScope = true`; adds the Friends Only / Public radio choice to the Create Post modal (defaults to Friends Only) and mirrors the choice in the live preview; `setFeedScope(scope)` JS toggles the active tab and re-calls `loadFeed()`; `renderFeed()` shows a small visibility badge per post card and a scope-aware empty state.
+
+**Rules:**
+- Never change the default visibility of a new post to `public`; the create-post radio must default to `'friends'` and the feed toggle must default to `'friends'` on page load.
+- Do not let the `public` scope query touch the friendships table — it must be friendship-independent by design (own posts + any post marked public, full stop).
+- Do not let the `friends` scope query filter on `visibility` — friends should keep seeing all of a friend's posts regardless of that post's visibility value, exactly as before this feature was added.
+
 ---
 
 ## Commission System Architecture
@@ -237,7 +258,8 @@ The check uses `$_SESSION['user']['id']` (set by `begin_user_session()` in `conf
 - Do not silently swallow password reset email failures.
 - Do not redirect unknown emails into the reset-password flow as though a reset code was sent.
 - Keep uploaded user content out of git (`/uploads/` is gitignored).
-- Feed posts are friend-only; discovery and moderation surfaces must not leak non-friend posts into the user feed.
+- Feed posts are **friends-only by default** (posts.visibility = 'friends'). A post only becomes visible outside the author's accepted friends when the author explicitly marks it `public` at creation time. Discovery and moderation surfaces must not leak `friends`-visibility posts to non-friends.
+- The Public feed tab is opt-in per viewer (Friends Only vs Public toggle) and opt-in per post (visibility radio in the Create Post modal). Never default either control to `public`.
 - **Never use cross-database JOIN syntax in new queries.** Always use the qualified-name or app-level-aggregation pattern described in instruction #1 above.
 
 ---
