@@ -84,6 +84,45 @@ class CommissionRepository {
         return $ids;
     }
 
+    /**
+     * Returns active (non-banned) admin and super_admin accounts, for populating
+     * the "Assigned Position/Admin" dropdown in admin/admin.php.
+     */
+    public function getAdminRoster(): array {
+        $conn = $this->getConnection('accounts');
+        $stmt = $conn->prepare(
+            "SELECT id, username, first_name, last_name, email, role
+             FROM accounts WHERE role IN (?, ?) AND banned = 0
+             ORDER BY first_name, last_name"
+        );
+        if (!$stmt) {
+            error_log("CommissionRepository::getAdminRoster prepare failed: " . $conn->error);
+            return [];
+        }
+        $r1 = 'admin';
+        $r2 = 'super_admin';
+        $stmt->bind_param('ss', $r1, $r2);
+        $stmt->execute();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
+        return $rows;
+    }
+
+    /**
+     * Sets (or clears, when $assignedAdminId is null) the admin assigned to
+     * handle a commission. Pure data write — validation and audit logging
+     * live in processAssignCommission().
+     */
+    public function assignCommissionAdmin(int $commissionId, ?int $assignedAdminId): bool {
+        $conn = $this->getConnection('commissions');
+        $stmt = $conn->prepare('UPDATE commissions SET assigned_admin_id = ? WHERE commissionID = ?');
+        if (!$stmt) return false;
+        $stmt->bind_param('ii', $assignedAdminId, $commissionId);
+        $ok = $stmt->execute();
+        $stmt->close();
+        return $ok;
+    }
+
     public function logAuditAction(int $adminId, string $adminUsername, string $action, int $targetId): void {
         $conn = $this->getConnection('audit_log');
         $log  = $conn->prepare(
@@ -126,6 +165,21 @@ class CommissionRepository {
         $noteCol   = isset($commissionColumns['admin_note'])   ? 'admin_note'   : "'' AS admin_note";
         $attachCol = isset($commissionColumns['stl_file_url']) ? 'stl_file_url AS attachment_url' : "'' AS attachment_url";
 
+        // Assigned Position for Commission: cross-DB LEFT JOIN back to accounts
+        // for the assigned admin's name/email. Guarded the same way as the
+        // other columns above so installs that haven't run
+        // migration_commissions_assigned_admin.sql yet don't fatal.
+        $hasAssignedCol = isset($commissionColumns['assigned_admin_id']);
+        $assignedSelect = $hasAssignedCol
+            ? "c.assigned_admin_id,
+               asgn.username AS assigned_admin_username,
+               CONCAT(asgn.first_name, ' ', asgn.last_name) AS assigned_admin_name,
+               asgn.email AS assigned_admin_email"
+            : "NULL AS assigned_admin_id, '' AS assigned_admin_username, '' AS assigned_admin_name, '' AS assigned_admin_email";
+        $assignedJoin = $hasAssignedCol
+            ? "LEFT JOIN `{$dbAccounts}`.accounts asgn ON c.assigned_admin_id = asgn.id"
+            : '';
+
         // Check payments table exists
         $connPayments    = $this->getConnection('commission_payments');
         $hasPaymentsTable = (bool)$connPayments->query("SHOW TABLES LIKE 'commission_payments'")->num_rows;
@@ -149,10 +203,12 @@ class CommissionRepository {
                         a.username AS requester_username,
                         CONCAT(a.first_name, ' ', a.last_name) AS requester_name,
                         a.profile_pic AS requester_pic,
-                        a.email AS requester_email
+                        a.email AS requester_email,
+                        {$assignedSelect}
                         {$paymentSubSelect}
                  FROM commissions c
                  JOIN `{$dbAccounts}`.accounts a ON c.userID = a.id
+                 {$assignedJoin}
                  ORDER BY c.created_at DESC"
             );
             $stmt->execute();
@@ -168,9 +224,11 @@ class CommissionRepository {
                         c.status,
                         c.created_at,
                         c.{$noteCol},
-                        c.{$attachCol}
+                        c.{$attachCol},
+                        {$assignedSelect}
                         {$paymentSubSelect}
                  FROM commissions c
+                 {$assignedJoin}
                  WHERE c.userID = ?
                  ORDER BY c.created_at DESC"
             );
@@ -272,5 +330,70 @@ class CommissionRepository {
         }
 
         return ['success' => false, 'error' => 'Update failed.'];
+    }
+
+    /**
+     * Assigned Position for Commission — sets or clears which admin is
+     * responsible for a commission.
+     *
+     * Access control (enforced here, not just in the UI):
+     *   - Only a Super Admin may assign or reassign a commission. Regular
+     *     admins can view their own assignment but cannot change any
+     *     assignment, including their own.
+     *   - An admin cannot be assigned to a commission they themselves
+     *     submitted (extends the existing No Self-Approval rule to
+     *     assignment, not just status/note/amount updates).
+     *   - The target must be an active (non-banned) admin or super_admin.
+     */
+    public function processAssignCommission(int $commissionId, ?int $assignedAdminId, int $actingAdminId, string $actingAdminUsername, bool $isSuperAdmin): array {
+        if (!$isSuperAdmin) {
+            return ['success' => false, 'error' => 'Only a Super Admin can assign commissions.'];
+        }
+
+        if (!$commissionId) {
+            return ['success' => false, 'error' => 'Invalid commission.'];
+        }
+
+        $existing = $this->getCommissionById($commissionId);
+        if (!$existing) {
+            return ['success' => false, 'error' => 'Commission not found.'];
+        }
+
+        $assignedName = null;
+        if ($assignedAdminId !== null) {
+            if ((int)($existing['userID'] ?? 0) === $assignedAdminId) {
+                return ['success' => false, 'error' => 'An admin cannot be assigned to a commission they submitted themselves.'];
+            }
+
+            $match = null;
+            foreach ($this->getAdminRoster() as $candidate) {
+                if ((int)$candidate['id'] === $assignedAdminId) {
+                    $match = $candidate;
+                    break;
+                }
+            }
+            if (!$match) {
+                return ['success' => false, 'error' => 'Selected admin is not eligible for assignment.'];
+            }
+            $assignedName = trim($match['first_name'] . ' ' . $match['last_name']) ?: $match['username'];
+        }
+
+        if (!$this->assignCommissionAdmin($commissionId, $assignedAdminId)) {
+            return ['success' => false, 'error' => 'Assignment failed.'];
+        }
+
+        $actionText = $assignedAdminId !== null
+            ? "Assigned commission #{$commissionId} to {$assignedName}"
+            : "Unassigned commission #{$commissionId}";
+        $this->logAuditAction($actingAdminId, $actingAdminUsername, $actionText, $commissionId);
+
+        return [
+            'success'              => true,
+            'assigned_admin_id'    => $assignedAdminId,
+            'assigned_admin_name'  => $assignedName,
+            'message'              => $assignedAdminId !== null
+                ? "Commission #{$commissionId} assigned to {$assignedName}."
+                : "Commission #{$commissionId} unassigned.",
+        ];
     }
 }

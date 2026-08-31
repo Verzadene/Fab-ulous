@@ -683,6 +683,17 @@ html, body {
   padding: 0 2px;
 }
 
+/* ── Assigned Position for Commission ── */
+.assigned-cell {
+  min-width: 150px;
+}
+.assign-form {
+  min-width: 150px;
+}
+.assign-select {
+  max-width: 170px;
+}
+
 /* ── Commission Form (inline in table) ── */
 .commission-form {
   display: flex;

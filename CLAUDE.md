@@ -211,6 +211,32 @@ An admin **cannot approve, reject, or modify** a commission they personally subm
 ### Session Variable Used
 The check uses `$_SESSION['user']['id']` (set by `begin_user_session()` in `config.php`) compared against `commissions.userID` (now explicitly SELECTed as `c.userID` in `CommissionRepository::getAllCommissions()`).
 
+### Assigned Position for Commission
+
+Each commission can have one admin/super_admin assigned as the "Assigned Position" responsible for handling it, stored as `commissions.assigned_admin_id` (nullable — `NULL` means unassigned).
+
+**Key files:**
+- `database/fab_ulous_setup_micro_dbs.sql` — canonical `commissions` table includes `assigned_admin_id` (with a supporting index).
+- `database/migration_commissions_assigned_admin.sql` — idempotent `ALTER TABLE` for installs created before this feature (checks `information_schema` first, like `migration_posts_visibility.sql` / `migration_messages_canonical.sql`).
+- `post/CommissionRepository.php` — `getAllCommissions()` detects the column via the existing `SHOW COLUMNS` schema-evolution check and, when present, LEFT JOINs back to `` `fab_ulous_accounts`.accounts `` (fully-qualified, cross-DB) to pull the assigned admin's username/name/email for both the admin and requester query paths. `getAdminRoster()` returns active (non-banned) admin/super_admin accounts for the assignment dropdown. `assignCommissionAdmin()` is the raw data write; `processAssignCommission()` layers on validation, audit logging, and the access-control rules below.
+- `admin/commission_assign.php` — dedicated AJAX endpoint for assignment (separate from `commission_update.php`, mirroring its auth pattern).
+- `admin/admin.php` — Commissions tab renders an "Assigned To" column (role-gated, see below) and fetches `$adminRoster` for the Super Admin dropdown. `assign_commission` is also handled as a POST-action fallback for non-JS submits.
+- `post/commissions.php` — the requester's own commission table includes an "Assigned Admin" column with a `mailto:` link to the assigned admin's email.
+
+**Access control (enforced server-side in `processAssignCommission()`, not just hidden in the UI):**
+1. **Only a Super Admin may assign or reassign a commission.** Regular admins — including the admin currently assigned to a commission — cannot change any assignment. The UI hides the assignment select for non-super-admins; `commission_assign.php` and `processAssignCommission()` both re-check `$isSuperAdmin` regardless of what the client sends.
+2. **An admin cannot be assigned to a commission they submitted themselves.** This extends the existing No Self-Approval rule (see above) from status/note/amount updates to assignment: `processAssignCommission()` rejects the attempt, and the Super Admin's dropdown in `admin.php` skips the requester's own account as an option.
+3. **Visibility of the assignment is role-gated per viewer, per commission:**
+   - **Super Admin:** always sees who is assigned (or "Unassigned") and gets the reassignment dropdown, for every commission.
+   - **The assigned admin:** sees a read-only "Assigned to you" badge for commissions assigned to them.
+   - **Any other regular admin ("non-assigned admin"):** cannot see who a commission is assigned to — sees a "🔒 Restricted" placeholder instead. They can still see whether a commission is unassigned (not considered sensitive).
+   - **The requesting user** (on `post/commissions.php`): always sees the assigned admin's name and contact email once one is assigned, so they know who to reach — this is the one case where the assignee's identity is intentionally exposed outside the admin/super_admin roles.
+4. **Target validation:** the assignee must currently be an active (`banned = 0`) `admin` or `super_admin` account; `processAssignCommission()` checks the candidate against `getAdminRoster()` before writing.
+
+**Audit logging:** assignment changes call `CommissionRepository::logAuditAction()` with `target_type = 'commission'` (the same category as status/note/amount updates — no new Live Audit filter bucket was added for this).
+
+**Not included in this pass:** assigning a commission does not send a notification to the assigned admin. `create_notification()`'s `type` column is a DB-level `ENUM`, so adding a new notification type would require its own schema migration — left as a follow-up rather than folded into this schema change.
+
 ---
 
 ## Admin Features
@@ -273,6 +299,7 @@ The check uses `$_SESSION['user']['id']` (set by `begin_user_session()` in `conf
 - The Public feed tab is opt-in per viewer (Friends Only vs Public toggle) and opt-in per post (visibility radio in the Create Post modal). Never default either control to `public`.
 - **Never use cross-database JOIN syntax in new queries.** Always use the qualified-name or app-level-aggregation pattern described in instruction #1 above.
 - Keep `audit_log.target_type` values distinct per Live Audit filter category (`login`, `logout`, `post`, `like`, `comment`, `account`, `commission`). Do not reuse an existing value for a new, unrelated event type — it will silently leak into another filter bucket on the admin dashboard.
+- **Assigned Position for Commission:** never render `assigned_admin_id`/`assigned_admin_name`/`assigned_admin_username` (or embed them in a `data-*` attribute, search string, etc.) for a regular admin who isn't the assigned admin on that commission — that data must stay server-side-filtered per viewer, not just visually hidden. Only Super Admins and the assigned admin themself may see who a commission is assigned to; the requesting user may see the assigned admin's name/email (not the admin dashboard). Only a Super Admin may change an assignment, and an admin can never be assigned to their own submitted commission.
 
 ---
 

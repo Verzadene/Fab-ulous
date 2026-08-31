@@ -176,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submi
               <tr>
                 <th>S/N</th>
                 <th>Title</th><th>Description</th><th>Status</th>
-                <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>File</th>
+                <th>Amount</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>Assigned Admin</th><th>File</th>
               </tr>
             </thead>
             <tbody id="commissionsTableBody">
@@ -314,6 +314,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submi
           fileHtml = `<a href="../${esc(c.attachment_url)}" target="_blank" class="commission-file-link">&#128196; View</a>`;
         }
 
+        // Assigned Position for Commission: users can see the assigned
+        // admin's contact email (but not the admin dashboard's internal
+        // assignment controls — this is a read-only mailto link).
+        let assignedHtml = '<span class="comm-empty-cell">Not yet assigned</span>';
+        if (c.assigned_admin_email) {
+          const assignedName = esc(c.assigned_admin_name?.trim() || c.assigned_admin_username || 'Admin');
+          assignedHtml = `<a href="mailto:${esc(c.assigned_admin_email)}" class="commission-file-link" title="Email ${assignedName}">${assignedName}</a>`;
+        }
+
         let payCellHtml = `<span class="comm-amount-text">${esc(formatMoney(amountNum))}</span>`;
         if (amountNum > 0 && c.payment_status !== 'paid') {
           payCellHtml += `
@@ -338,6 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'submi
             <td>${paymentHtml}</td>
             <td class="comm-date-cell">${formatDate(c.created_at)}</td>
             <td class="comm-note-cell">${esc(c.admin_note || 'No update yet.')}</td>
+            <td>${assignedHtml}</td>
             <td>${fileHtml}</td>
           </tr>`;
       }).join('');

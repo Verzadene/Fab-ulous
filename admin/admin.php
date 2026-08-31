@@ -51,6 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         // Delegate commission updates to CommissionRepository
         $result = $commissionRepo->processUpdateCommission($targetID, $newStatus, $adminNote, $amount, $adminID, $adminUsername, ['Pending', 'Accepted', 'Ongoing', 'Delayed', 'Completed', 'Cancelled']);
         $actionMsg = $result['success'] ? $result['message'] ?? "Commission #{$targetID} updated." : $result['error'];
+    } elseif ($action === 'assign_commission' && $targetID) {
+        // Assigned Position for Commission — non-AJAX fallback path.
+        // processAssignCommission() re-checks $isSuperAdmin itself, so a
+        // crafted POST from a regular admin is still rejected server-side.
+        $rawAssignee = $_POST['assigned_admin_id'] ?? '';
+        $assignedAdminId = ($rawAssignee === '') ? null : (int)$rawAssignee;
+        $result = $commissionRepo->processAssignCommission($targetID, $assignedAdminId, $adminID, $adminUsername, $isSuperAdmin);
+        $actionMsg = $result['success'] ? $result['message'] ?? "Commission #{$targetID} assignment updated." : $result['error'];
     }
 
     header('Location: admin.php?msg=' . urlencode($actionMsg));
@@ -84,6 +92,11 @@ $allPosts = $adminRepo->getAllPosts();
 
 // ── Commissions ──────────────────────────────────────────────────
 $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call CommissionRepository for all commissions
+
+// Assigned Position for Commission: roster of active admins/super_admins for
+// the assignment dropdown. Only Super Admins render/use this control, but
+// fetching it is cheap and keeps the markup below simple.
+$adminRoster = $isSuperAdmin ? $commissionRepo->getAdminRoster() : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -452,12 +465,12 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
           <thead>
             <tr>
               <th>S/N</th><th>ID</th><th>Username</th><th>Full Name</th><th>Email</th><th>Title</th><th>Description</th>
-              <th>Amount</th><th>Status</th><th>File</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
+              <th>Amount</th><th>Status</th><th>Assigned To</th><th>File</th><th>Payment</th><th>Submitted</th><th>Admin Note</th><th>Update</th>
             </tr>
           </thead>
           <tbody>
             <?php if (empty($commissions)): ?>
-              <tr class="empty-row"><td colspan="14" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
+              <tr class="empty-row"><td colspan="15" style="text-align:center;padding:28px;color:rgba(255,255,255,0.4);">No commissions yet.</td></tr>
             <?php else: ?>
               <?php $commRowNum = 1; foreach ($commissions as $c): ?>
                 <?php
@@ -465,6 +478,14 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
                   // Only another admin can change status/note/amount for their own requests.
                   $commRequesterId  = (int)($c['userID'] ?? 0);
                   $isSelfCommission = ($commRequesterId === $adminID);
+
+                  // Assigned Position for Commission — visibility rules:
+                  //   - Super Admin: always sees who is assigned and can reassign.
+                  //   - The assigned admin: sees that it's assigned to them.
+                  //   - Any other regular admin: cannot see who a commission is
+                  //     assigned to (only that it is/isn't assigned).
+                  $assignedAdminId = !empty($c['assigned_admin_id']) ? (int)$c['assigned_admin_id'] : 0;
+                  $isAssignedToMe  = ($assignedAdminId > 0 && $assignedAdminId === $adminID);
 
                   $searchString = htmlspecialchars(strtolower(
                     ($c['requester_username'] ?? '') . ' ' .
@@ -519,6 +540,36 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
                     <span class="<?php echo $statusClass; ?>" id="commission-status-<?php echo $c['commissionID']; ?>">
                       <?php echo htmlspecialchars($c['status']); ?>
                     </span>
+                  </td>
+                  <td class="assigned-cell" id="commission-assigned-<?php echo $c['commissionID']; ?>">
+                    <?php if ($isSuperAdmin): ?>
+                      <form method="POST" class="commission-form assign-form" data-commission-id="<?php echo $c['commissionID']; ?>">
+                        <input type="hidden" name="action"    value="assign_commission"/>
+                        <input type="hidden" name="target_id" value="<?php echo $c['commissionID']; ?>"/>
+                        <select name="assigned_admin_id" class="commission-select assign-select">
+                          <option value="">— Unassigned —</option>
+                          <?php foreach ($adminRoster as $a): ?>
+                            <?php
+                              $rosterId   = (int)$a['id'];
+                              $rosterName = trim($a['first_name'] . ' ' . $a['last_name']) ?: $a['username'];
+                              // Keep the No Self-Approval spirit: don't offer the
+                              // commission's own requester as an assignment option.
+                              if ($rosterId === $commRequesterId) continue;
+                            ?>
+                            <option value="<?php echo $rosterId; ?>" <?php echo $assignedAdminId === $rosterId ? 'selected' : ''; ?>>
+                              <?php echo htmlspecialchars($rosterName); ?><?php echo $rosterId === $adminID ? ' (you)' : ''; ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                        <button type="submit" class="action-btn btn-save">Assign</button>
+                      </form>
+                    <?php elseif ($isAssignedToMe): ?>
+                      <span class="status-badge status-accepted" title="This commission is assigned to you.">Assigned to you</span>
+                    <?php elseif ($assignedAdminId > 0): ?>
+                      <span class="no-action" title="Assignment details are only visible to the assigned admin and Super Admins.">&#128274; Restricted</span>
+                    <?php else: ?>
+                      <span class="no-action">Unassigned</span>
+                    <?php endif; ?>
                   </td>
                   <td><?php echo $fileHtml; ?></td>
                   <td><?php echo $payHtml; ?></td>
@@ -899,7 +950,10 @@ async function saveCommissionForm(form, successMessage) {
 
 // Wire up commission forms — only non-self-request rows have .commission-form elements.
 // Rows where the admin is the requester render a locked placeholder instead (self-approval prevention).
-document.querySelectorAll('.commission-form').forEach(form => {
+// Assigned Position for Commission: .assign-form also matches `.commission-form`
+// (for shared styling) but is handled separately below via saveAssignForm, so
+// it's excluded here.
+document.querySelectorAll('.commission-form:not(.assign-form)').forEach(form => {
   const select = form.querySelector('.commission-select');
 
   form.addEventListener('submit', event => {
@@ -909,6 +963,41 @@ document.querySelectorAll('.commission-form').forEach(form => {
 
   select?.addEventListener('change', () => {
     saveCommissionForm(form, `Commission #${form.dataset.commissionId} status updated.`);
+  });
+});
+
+// ── Assigned Position for Commission (Super Admin only) ───────────
+async function saveAssignForm(form, successMessage) {
+  const payload = new FormData(form);
+
+  try {
+    const response = await fetch('commission_assign.php', {
+      method: 'POST',
+      body: payload
+    });
+    const data = await response.json();
+
+    if (!data.success) {
+      showActionMessage(data.error || 'Assignment update failed.', true);
+      return;
+    }
+
+    showActionMessage(successMessage || data.message || `Commission #${form.dataset.commissionId} assignment updated.`);
+  } catch (error) {
+    showActionMessage('Assignment update failed. Please try again.', true);
+  }
+}
+
+document.querySelectorAll('.assign-form').forEach(form => {
+  const select = form.querySelector('.assign-select');
+
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    saveAssignForm(form, `Commission #${form.dataset.commissionId} assignment saved.`);
+  });
+
+  select?.addEventListener('change', () => {
+    saveAssignForm(form);
   });
 });
 
