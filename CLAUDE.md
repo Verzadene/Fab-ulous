@@ -275,6 +275,11 @@ Each commission can have one admin/super_admin assigned as the "Assigned Positio
 - **Do not** revert the Help button to a plain `<a href="README.md">`. Keep it as `<button data-bs-toggle="offcanvas">`.
 - All Help / offcanvas styles live at the bottom of `post/post.css` (globally imported by every authenticated page).
 
+### Admin Dashboard Entry Points
+- The burger-menu drawer link to `admin/admin.php` is rendered once, inside `includes/app_nav.php`, gated by `$navIsAdmin` (`$isAdmin ?? in_array($navRole, ['admin', 'super_admin'], true)`). It shows identically for `admin` and `super_admin` — no separate super-admin-only variant.
+- Every authenticated page that includes `app_nav.php` (`post/post.php`, `profile/profile.php`, `post/messages.php`, `post/commissions.php`) must set `$role`/`$isAdmin` from `$_SESSION['user']['role']` before the `require` — even though `app_nav.php` has a `$_SESSION`-based fallback, pages should set these explicitly for clarity and consistency.
+- `profile/profile.php` additionally has its own persistent right-hand "Account Info" sidebar (separate from the drawer). It shows an "Admin Dashboard" link above Logout, gated by the same `$isAdmin` flag, for both `admin` and `super_admin`.
+
 ---
 
 ## Verification Checklist

@@ -16,6 +16,8 @@ if (empty($_SESSION['mfa_verified'])) {
 $commissionRepo = new CommissionRepository('db_connect');
 $userId   = (int) $_SESSION['user']['id'];
 $username = $_SESSION['user']['username'];
+$role     = $_SESSION['user']['role'] ?? 'user';
+$isAdmin  = in_array($role, ['admin', 'super_admin'], true);
 
 $myAvatarUrl = get_current_user_avatar();
 

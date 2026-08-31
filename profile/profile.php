@@ -158,6 +158,9 @@ $myAvatarUrl = get_current_user_avatar();
             <span id="memberSinceText"></span>
           </p>
           <div class="sidebar-links">
+            <?php if ($isAdmin): ?>
+              <a href="../admin/admin.php" class="sidebar-nav-link admin">Admin Dashboard</a>
+            <?php endif; ?>
             <a href="../login/logout.php" class="sidebar-nav-link logout">&#8617; Logout</a>
           </div>
         </div>

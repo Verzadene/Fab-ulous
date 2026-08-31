@@ -366,6 +366,13 @@
   color: var(--green-1);
 }
 
+.sidebar-nav-link.admin { color: var(--green-1); }
+
+.sidebar-nav-link.admin:hover {
+  background: #f4f8f5;
+  color: var(--green-1);
+}
+
 .sidebar-nav-link.logout { color: #b03a2e; }
 
 .sidebar-nav-link.logout:hover {
