@@ -86,9 +86,11 @@ CREATE TABLE IF NOT EXISTS `commissions` (
   `status` enum('Pending','Accepted','Ongoing','Delayed','Completed','Cancelled') NOT NULL DEFAULT 'Pending',
   `stl_file_url` varchar(255) DEFAULT NULL,
   `admin_note` text DEFAULT NULL,
+  `assigned_admin_id` int(11) DEFAULT NULL, -- Assigned Position for Commission: the admin/super_admin handling this request. NULL = unassigned.
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`commissionID`),
-  KEY `userID` (`userID`) -- Originally a FOREIGN KEY to fab_ulous_accounts.accounts(id). Integrity is now handled by the application.
+  KEY `userID` (`userID`), -- Originally a FOREIGN KEY to fab_ulous_accounts.accounts(id). Integrity is now handled by the application.
+  KEY `assigned_admin_id` (`assigned_admin_id`) -- Originally a FOREIGN KEY to fab_ulous_accounts.accounts(id). Integrity is now handled by the application.
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. Commission Payments Database
@@ -201,3 +203,86 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   PRIMARY KEY (`logID`),
   KEY `admin_id` (`admin_id`) -- Originally a FOREIGN KEY to fab_ulous_accounts.accounts(id). Integrity is now handled by the application.
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Idempotent post-creation migrations
+--
+-- CREATE TABLE IF NOT EXISTS above only builds these tables on a brand-new
+-- database; it will NOT add new columns to a `commissions` or `posts` table
+-- that already exists from an older version of this schema. The two blocks
+-- below are the idempotent ALTER TABLE migrations (merged in from
+-- migration_posts_visibility.sql and migration_commissions_assigned_admin.sql)
+-- that upgrade a pre-existing install to the current schema. They are safe
+-- to re-run — each checks information_schema first and skips the ALTER if
+-- the column/index is already present, so running this whole script against
+-- a fresh install is also a no-op here (the columns already exist from the
+-- CREATE TABLE statements above).
+-- ════════════════════════════════════════════════════════════════════════
+
+-- ── Migration: posts.visibility (Public / Friends Only feed toggle) ──────
+USE `fab_ulous_posts`;
+
+SET @column_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = 'fab_ulous_posts'
+      AND TABLE_NAME = 'posts'
+      AND COLUMN_NAME = 'visibility'
+);
+
+SET @ddl = IF(
+    @column_exists = 0,
+    "ALTER TABLE `posts` ADD COLUMN `visibility` ENUM('public','friends') NOT NULL DEFAULT 'friends' AFTER `image_url`",
+    "SELECT 'visibility column already present, skipping' AS status"
+);
+
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Backfill: any existing rows created before this migration default to
+-- 'friends' automatically via the column DEFAULT, so no UPDATE is needed.
+
+-- ── Migration: commissions.assigned_admin_id (Assigned Position for Commission) ──
+USE `fab_ulous_commissions`;
+
+SET @column_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = 'fab_ulous_commissions'
+      AND TABLE_NAME = 'commissions'
+      AND COLUMN_NAME = 'assigned_admin_id'
+);
+
+SET @ddl = IF(
+    @column_exists = 0,
+    "ALTER TABLE `commissions` ADD COLUMN `assigned_admin_id` INT(11) DEFAULT NULL AFTER `admin_note`",
+    "SELECT 'assigned_admin_id column already present, skipping' AS status"
+);
+
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Add the supporting index only if it doesn't already exist (fresh installs
+-- from setup_micro_dbs.sql create it as part of the CREATE TABLE).
+SET @index_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = 'fab_ulous_commissions'
+      AND TABLE_NAME = 'commissions'
+      AND INDEX_NAME = 'assigned_admin_id'
+);
+
+SET @idx_ddl = IF(
+    @index_exists = 0,
+    "ALTER TABLE `commissions` ADD KEY `assigned_admin_id` (`assigned_admin_id`)",
+    "SELECT 'assigned_admin_id index already present, skipping' AS status"
+);
+
+PREPARE idx_stmt FROM @idx_ddl;
+EXECUTE idx_stmt;
+DEALLOCATE PREPARE idx_stmt;
+
+-- Backfill: existing rows default to NULL (unassigned) automatically via the
+-- column DEFAULT, so no UPDATE is needed.
