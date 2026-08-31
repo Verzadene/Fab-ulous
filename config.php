@@ -5,6 +5,44 @@
  *               require_once __DIR__ . '/config.php';       (from root)
  */
 
+/**
+ * Detects this app's own base URL (scheme + host + folder) at runtime so
+ * the project runs under any `htdocs`/document-root checkout — regardless
+ * of the machine's hostname or the folder name it's cloned into (e.g.
+ * "Fab-ulous", "FABulous-dev", etc.) — without editing config for every
+ * install. Falls back to a plain localhost guess in CLI contexts (tests)
+ * where there is no web request to inspect.
+ */
+function fabulous_detect_base_url(): string
+{
+    if (php_sapi_name() === 'cli' || empty($_SERVER['HTTP_HOST'])) {
+        return 'http://localhost/' . basename(__DIR__);
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+        ? 'https'
+        : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+
+    // Derive the base path under the web root by diffing this file's real
+    // path against DOCUMENT_ROOT, so no folder name is assumed anywhere.
+    $basePath = '';
+    if (!empty($_SERVER['DOCUMENT_ROOT'])) {
+        $docRoot = str_replace('\\', '/', rtrim(realpath($_SERVER['DOCUMENT_ROOT']) ?: $_SERVER['DOCUMENT_ROOT'], '/\\'));
+        $appRoot = str_replace('\\', '/', realpath(__DIR__) ?: __DIR__);
+        if ($docRoot !== '' && strpos($appRoot, $docRoot) === 0) {
+            $basePath = substr($appRoot, strlen($docRoot));
+        }
+    }
+    $basePath = '/' . trim($basePath, '/');
+    if ($basePath === '/') {
+        $basePath = '';
+    }
+
+    return $scheme . '://' . $host . $basePath;
+}
+
 $localConfig = __DIR__ . '/config.local.php';
 if (is_file($localConfig)) {
     require_once $localConfig;
@@ -19,12 +57,12 @@ defined('GOOGLE_CLIENT_SECRET') || define(
     'GOOGLE_CLIENT_SECRET',
     getenv('GOOGLE_CLIENT_SECRET') ?: ''
 );
+defined('APP_ENV') || define('APP_ENV', getenv('APP_ENV') ?: 'local');
+defined('APP_URL') || define('APP_URL', getenv('APP_URL') ?: fabulous_detect_base_url());
 defined('GOOGLE_REDIRECT_URI') || define(
     'GOOGLE_REDIRECT_URI',
-    getenv('GOOGLE_REDIRECT_URI') ?: 'http://localhost/Fab-ulous/oauth/oauth2callback.php'
+    getenv('GOOGLE_REDIRECT_URI') ?: (APP_URL . '/oauth/oauth2callback.php')
 );
-defined('APP_ENV') || define('APP_ENV', getenv('APP_ENV') ?: 'local');
-defined('APP_URL') || define('APP_URL', getenv('APP_URL') ?: 'http://localhost/Fab-ulous');
 
 // PayMongo Checkout
 defined('PAYMONGO_SECRET_KEY') || define(
