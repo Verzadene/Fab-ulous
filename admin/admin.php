@@ -140,7 +140,7 @@ $adminRoster = $isSuperAdmin ? $commissionRepo->getAdminRoster() : [];
         <h1 class="admin-title">Dashboard</h1>
       </div>
       <div class="header-actions">
-        <button class="btn-print" onclick="exportCurrentTabCSV()">&#128190; Export CSV</button>
+        <button class="btn-print" onclick="exportCurrentTabCSV()">Export CSV</button>
         <img src="../images/Top_Left_Nav_Logo.png" alt="" class="header-logo"/>
       </div>
     </div>
@@ -582,7 +582,7 @@ $adminRoster = $isSuperAdmin ? $commissionRepo->getAdminRoster() : [];
                       <!-- Self-approval prevention: this admin submitted this commission.
                            Only another admin can approve or modify it. -->
                       <span class="no-action" title="You cannot modify your own commission request. Another admin must action this.">
-                        &#128274; Self-request
+                        Self-request
                       </span>
                     <?php else: ?>
                       <form method="POST" class="commission-form" data-commission-id="<?php echo $c['commissionID']; ?>">

@@ -205,7 +205,7 @@ The commission system is split into two strictly separated surfaces:
 
 An admin **cannot approve, reject, or modify** a commission they personally submitted. Enforced at two layers:
 
-1. **UI layer (`admin.php`):** Rows where `$c['userID'] === $adminID` render a locked `🔒 Self-request` placeholder instead of the update form. The select, note, amount field, and Save button are never rendered for self-submissions.
+1. **UI layer (`admin.php`):** Rows where `$c['userID'] === $adminID` render a `Self-request` placeholder (no lock emoji) instead of the update form. The select, note, amount field, and Save button are never rendered for self-submissions.
 2. **Server layer (`admin/commission_update.php`):** Before processing any update, the endpoint fetches the commission's `userID` and compares it to `$_SESSION['user']['id']`. If they match it returns `{success: false, error: '...'}` and exits — the update is blocked regardless of what the client sends.
 
 ### Session Variable Used
