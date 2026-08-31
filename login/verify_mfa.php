@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                     "INSERT INTO audit_log
                         (admin_id, admin_username, action, target_type, target_id, visibility_role)
                      VALUES
-                        (?, ?, 'User Login', 'account', ?, 'admin')"
+                        (?, ?, 'User Login', 'login', ?, 'admin')"
                 );
                 if ($logStmt) {
                     $logStmt->bind_param('isi', $loginUserId, $loginUsername, $loginUserId);

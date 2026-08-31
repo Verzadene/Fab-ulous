@@ -15,7 +15,7 @@ if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
                 "INSERT INTO audit_log
                     (admin_id, admin_username, action, target_type, target_id, visibility_role)
                  VALUES
-                    (?, ?, 'User Logout', 'account', ?, 'admin')"
+                    (?, ?, 'User Logout', 'logout', ?, 'admin')"
             );
             if ($stmt) {
                 $stmt->bind_param('isi', $userId, $username, $userId);

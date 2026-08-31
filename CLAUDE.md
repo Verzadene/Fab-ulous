@@ -108,21 +108,32 @@ if (!empty($_SESSION['user']) && !empty($_SESSION['mfa_verified'])) {
 
 **`auth_status.php`** (project root): A new, dedicated endpoint that starts the session, checks `$_SESSION['user']` and `$_SESSION['mfa_verified']`, and returns `{"authenticated":true,"redirect":"..."}` or `{"authenticated":false}` as JSON. It requires no input and has no side effects.
 
-### 12. Audit Log: Login & Logout Events
-User login and logout events are now tracked in the `audit_log` table in the `fab_ulous_audit_log` database.
+### 12. Audit Log: Live Audit (Login, Logout, Posts, Reacts, Comments)
+User activity is tracked in the `audit_log` table in the `fab_ulous_audit_log` database and surfaced live in Admin Dashboard > Live Audit.
 
-**Login** is recorded inside `login/verify_mfa.php` immediately after `begin_user_session()` succeeds and before the `header('Location: ...')` redirect. The Google OAuth path (`oauth/oauth2callback.php`) calls `begin_user_session()` directly and can be updated the same way if login tracking via Google is required.
+**Login** is recorded inside `login/verify_mfa.php` immediately after `begin_user_session()` succeeds and before the `header('Location: ...')` redirect. The Google OAuth path (`oauth/oauth2callback.php`) calls `begin_user_session()` directly and logs its own `'User Login via Google OAuth'` entry the same way.
 
 **Logout** is recorded inside `login/logout.php` and `admin/admin_logout.php` **before** `session_destroy()` while the user identity is still available in `$_SESSION['user']`.
 
-**Schema compatibility:** Both events reuse the existing `audit_log` columns without any schema change:
-- `admin_id` / `target_id` → the logging user's own `id`
-- `admin_username` → the logging user's `username`
-- `action` → `'User Login'` or `'User Logout'` (string)
-- `target_type` → `'account'`
+**Posts, Reacts (likes), and Comments** are recorded from `post/PostRepository.php`:
+- `processCreatePost()` logs on a successful post creation (`target_type = 'post'`).
+- `processDeletePost()` logs on a successful self-delete of a post (`target_type = 'post'`, pre-existing). Admin-initiated post removal is logged separately by `AdminRepository::processDeletePost()`, also `target_type = 'post'`.
+- `processLike()` logs on every like **and** unlike toggle (`target_type = 'like'`).
+- `addComment()` logs on a successful new comment (`target_type = 'comment'`).
+- `deleteComment()` logs on a successful self-delete of a comment (`target_type = 'comment'`). It looks up the comment's parent `postID` before the row is deleted (needed for `target_id`), and now correctly checks `affected_rows` before reporting success — previously it returned `true` from `$stmt->execute()` alone, which would report success even if the `WHERE commentID = ? AND userID = ?` matched no row (e.g. a non-owner delete attempt).
+
+Each of these repository methods takes an optional `$actorUsername` argument — the calling controller (`post/create_post.php`, `post/like.php`, `post/comment.php`) passes `$_SESSION['user']['username']` in. If it's omitted or empty, no audit row is written for that call, so any new call site must pass the username to be tracked. `PostRepository::logAuditAction()` accepts a `$targetType` parameter (defaults to `'post'` for backward compatibility with the existing self-delete-post call site).
+
+**Schema compatibility:** All of the above reuse the existing `audit_log` columns without any schema change:
+- `admin_id` / `target_id` → the acting user's own `id` (or the post ID for post/like/comment events)
+- `admin_username` → the acting user's `username`
+- `action` → a human-readable description (e.g. `'User Login'`, `'User jdoe liked post #42'`)
+- `target_type` → the Live Audit filter category: `'login'`, `'logout'`, `'post'`, `'like'`, or `'comment'`. (Admin-initiated account actions such as ban/unban/promote/demote/delete still use `'account'`, set via `AdminRepository::logAuditAction()`'s heuristic — this is intentionally distinct from `'login'`/`'logout'` so the Live Audit type filter doesn't conflate the two.)
 - `visibility_role` → `'admin'` (visible to all admins and super_admins)
 
-**Filter compatibility:** Because `admin_username`, `action`, `first_name`, and `last_name` are all columns already included in `AdminRepository::searchAuditLogs()`, the existing search bar (Username / First Name / Last Name) and time filter (8 hrs, 24 hrs, etc.) cover these new events with no additional code.
+**Filter compatibility:** `AdminRepository::searchAuditLogs()` selects `al.target_type` alongside the existing columns. The admin dashboard's Live Audit card renders it as a `data-type` attribute on each `.audit-entry`, and a client-side radio-button filter (All / Logins / Logouts / Reacts / Comments / Posts) in `admin/admin.php`'s `filterAuditLog()` JS combines it with the existing text-search filter — both apply to the log entries already loaded for the selected time window. Because `admin_username`, `action`, `first_name`, and `last_name` are all columns already included in `searchAuditLogs()`, the existing search bar covers all these event types with no additional server-side code beyond the `target_type` SELECT.
+
+**When adding a new activity type to log:** call `logAuditAction()` (on the relevant repository) with a distinct `$targetType`, and add a matching entry to the `$auditTypes` array in `admin/admin.php`'s Live Audit filter markup so it appears as a filter option.
 
 ### 13. Email Domain Whitelist
 User registration and Google OAuth sign-in are restricted to a whitelist of approved email domains for security and organizational purposes.
@@ -261,6 +272,7 @@ The check uses `$_SESSION['user']['id']` (set by `begin_user_session()` in `conf
 - Feed posts are **friends-only by default** (posts.visibility = 'friends'). A post only becomes visible outside the author's accepted friends when the author explicitly marks it `public` at creation time. Discovery and moderation surfaces must not leak `friends`-visibility posts to non-friends.
 - The Public feed tab is opt-in per viewer (Friends Only vs Public toggle) and opt-in per post (visibility radio in the Create Post modal). Never default either control to `public`.
 - **Never use cross-database JOIN syntax in new queries.** Always use the qualified-name or app-level-aggregation pattern described in instruction #1 above.
+- Keep `audit_log.target_type` values distinct per Live Audit filter category (`login`, `logout`, `post`, `like`, `comment`, `account`, `commission`). Do not reuse an existing value for a new, unrelated event type — it will silently leak into another filter bucket on the admin dashboard.
 
 ---
 

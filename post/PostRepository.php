@@ -122,7 +122,7 @@ class PostRepository {
     // Posts CRUD
     // ──────────────────────────────────────────────────────────────────────────
 
-    public function processCreatePost(int $userID, string $caption, ?array $imageFile, string $visibility = 'friends'): bool {
+    public function processCreatePost(int $userID, string $caption, ?array $imageFile, string $visibility = 'friends', string $actorUsername = ''): bool {
         $imageURL = null;
         $visibility = ($visibility === 'public') ? 'public' : 'friends';
 
@@ -145,17 +145,33 @@ class PostRepository {
             return false;
         }
 
-        return $this->createPost($userID, $caption, $imageURL, $visibility);
+        $postID = $this->createPost($userID, $caption, $imageURL, $visibility);
+
+        // ── Live Audit: new post created ──────────────────────────────
+        if ($postID && $actorUsername !== '') {
+            $preview = mb_substr($caption, 0, 80);
+            $action  = "User {$actorUsername} created a new post #{$postID}"
+                . ($preview !== '' ? ": \"{$preview}\"" : ' (image only)');
+            $this->logAuditAction($userID, $actorUsername, $action, $postID, 'post');
+        }
+
+        return (bool)$postID;
     }
 
-    public function createPost(int $userID, string $caption, ?string $imageURL, string $visibility = 'friends'): bool {
+    /**
+     * Inserts a new post row.
+     *
+     * @return int|false The new post's ID on success, false on failure.
+     */
+    public function createPost(int $userID, string $caption, ?string $imageURL, string $visibility = 'friends'): int|false {
         $visibility = ($visibility === 'public') ? 'public' : 'friends';
         $connPosts = $this->getConnection('posts');
         $stmt = $connPosts->prepare("INSERT INTO posts (userID, caption, image_url, visibility) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("isss", $userID, $caption, $imageURL, $visibility);
         $ok = $stmt->execute();
+        $newID = $ok ? (int)$connPosts->insert_id : false;
         $stmt->close();
-        return $ok;
+        return $newID;
     }
 
     public function processEditPost(int $postID, int $userID, string $caption): bool {
@@ -240,12 +256,18 @@ class PostRepository {
         return $count;
     }
 
-    public function processLike(int $postID, int $userID): array {
+    public function processLike(int $postID, int $userID, string $actorUsername = ''): array {
         $liked       = $this->toggleLike($postID, $userID);
         $postOwnerID = $this->getPostOwner($postID);
 
         if ($liked && $postOwnerID && $postOwnerID !== $userID) {
             $this->addNotification($postOwnerID, $userID, 'like', $postID);
+        }
+
+        // ── Live Audit: reacts (like/unlike) ────────────────────────────
+        if ($actorUsername !== '') {
+            $verb = $liked ? 'liked' : 'unliked';
+            $this->logAuditAction($userID, $actorUsername, "User {$actorUsername} {$verb} post #{$postID}", $postID, 'like');
         }
 
         return ['liked' => $liked, 'like_count' => $this->getLikeCount($postID)];
@@ -307,12 +329,19 @@ class PostRepository {
         return $commentRows;
     }
 
-    public function addComment(int $postID, int $userID, string $content): bool {
+    public function addComment(int $postID, int $userID, string $content, string $actorUsername = ''): bool {
         $connComments = $this->getConnection('comments');
         $stmt = $connComments->prepare("INSERT INTO comments (postID, userID, comment_text) VALUES (?, ?, ?)");
         $stmt->bind_param("iis", $postID, $userID, $content);
         $ok = $stmt->execute();
         $stmt->close();
+
+        // ── Live Audit: comments ────────────────────────────────────────
+        if ($ok && $actorUsername !== '') {
+            $preview = mb_substr($content, 0, 80);
+            $this->logAuditAction($userID, $actorUsername, "User {$actorUsername} commented on post #{$postID}: \"{$preview}\"", $postID, 'comment');
+        }
+
         return $ok;
     }
 
@@ -335,17 +364,36 @@ class PostRepository {
         return $ok;
     }
 
-    public function deleteComment(int $commentID, int $userID): bool {
+    public function deleteComment(int $commentID, int $userID, string $actorUsername = ''): bool {
         $connComments = $this->getConnection('comments');
+
+        // Fetch the parent postID first — needed for the audit log target_id,
+        // and no longer available once the row is deleted.
+        $postID = 0;
+        $sel = $connComments->prepare("SELECT postID FROM comments WHERE commentID = ? AND userID = ?");
+        $sel->bind_param("ii", $commentID, $userID);
+        $sel->execute();
+        $row = $sel->get_result()->fetch_assoc();
+        $sel->close();
+        $postID = $row ? (int)$row['postID'] : 0;
+
         $stmt = $connComments->prepare("DELETE FROM comments WHERE commentID = ? AND userID = ?");
         $stmt->bind_param("ii", $commentID, $userID);
         $ok = $stmt->execute();
+        $affected = $stmt->affected_rows;
         $stmt->close();
-        return $ok;
+        $deleted = $ok && $affected > 0;
+
+        // ── Live Audit: comments (deletion) ─────────────────────────────
+        if ($deleted && $actorUsername !== '') {
+            $this->logAuditAction($userID, $actorUsername, "User {$actorUsername} deleted their comment #{$commentID} on post #{$postID}", $postID, 'comment');
+        }
+
+        return $deleted;
     }
 
-    public function processAddComment(int $postID, int $userID, string $content): bool {
-        $ok          = $this->addComment($postID, $userID, $content);
+    public function processAddComment(int $postID, int $userID, string $content, string $actorUsername = ''): bool {
+        $ok          = $this->addComment($postID, $userID, $content, $actorUsername);
         $postOwnerID = $this->getPostOwner($postID);
 
         if ($ok && $postOwnerID && $postOwnerID !== $userID) {
@@ -364,14 +412,21 @@ class PostRepository {
         create_notification($userID, $actorID, $type, $postID);
     }
 
-    public function logAuditAction(int $userId, string $username, string $action, int $targetId): void {
+    /**
+     * Logs a user-generated activity event to the Live Audit log.
+     *
+     * @param string $targetType Event category used by the admin dashboard's Live Audit
+     *                           type filter — 'post', 'like', or 'comment'. Defaults to
+     *                           'post' to preserve the original behaviour of this method.
+     */
+    public function logAuditAction(int $userId, string $username, string $action, int $targetId, string $targetType = 'post'): void {
         $connAudit = $this->getConnection('audit_log');
         $log = $connAudit->prepare(
             "INSERT INTO audit_log (admin_id, admin_username, action, target_type, target_id, visibility_role)
-             VALUES (?, ?, ?, 'post', ?, 'admin')"
+             VALUES (?, ?, ?, ?, ?, 'admin')"
         );
         if ($log) {
-            $log->bind_param('issi', $userId, $username, $action, $targetId);
+            $log->bind_param('isssi', $userId, $username, $action, $targetType, $targetId);
             $log->execute();
             $log->close();
         }

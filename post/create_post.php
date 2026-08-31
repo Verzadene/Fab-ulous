@@ -9,12 +9,13 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 }
 
 $userID     = (int)$_SESSION['user']['id'];
+$username   = (string)($_SESSION['user']['username'] ?? '');
 $caption    = trim($_POST['caption'] ?? '');
 $image      = $_FILES['image'] ?? null;
 $visibility = ($_POST['visibility'] ?? 'friends') === 'public' ? 'public' : 'friends';
 
 $repo = new PostRepository('db_connect');
-$repo->processCreatePost($userID, $caption, $image, $visibility);
+$repo->processCreatePost($userID, $caption, $image, $visibility, $username);
 
 header('Location: post.php');
 exit;

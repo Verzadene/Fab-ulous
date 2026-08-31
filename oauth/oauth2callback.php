@@ -129,7 +129,7 @@ try {
         "INSERT INTO audit_log
             (admin_id, admin_username, action, target_type, target_id, visibility_role)
          VALUES
-            (?, ?, 'User Login via Google OAuth', 'account', ?, 'admin')"
+            (?, ?, 'User Login via Google OAuth', 'login', ?, 'admin')"
     );
     if ($logStmt) {
         $logStmt->bind_param('isi', $auditUserId, $auditUsername, $auditUserId);

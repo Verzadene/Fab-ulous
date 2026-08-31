@@ -11,7 +11,8 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 
 $repo = new PostRepository('db_connect');
 
-$userID = (int)$_SESSION['user']['id'];
+$userID   = (int)$_SESSION['user']['id'];
+$username = (string)($_SESSION['user']['username'] ?? '');
 
 // ── GET: fetch comments ────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get') {
@@ -32,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode(['status' => 'error', 'message' => 'Missing data']);
             exit;
         }
-        $ok = $repo->deleteComment($commentID, $userID);
+        $ok = $repo->deleteComment($commentID, $userID, $username);
         echo json_encode(['status' => $ok ? 'success' : 'error']);
         exit;
     }
@@ -60,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $content = mb_substr($content, 0, 500);
 
-    $ok = $repo->addComment($postID, $userID, $content);
+    $ok = $repo->addComment($postID, $userID, $content, $username);
 
     if ($ok) {
         echo json_encode(['status' => 'success', 'data' => []]);

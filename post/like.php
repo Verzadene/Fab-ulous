@@ -11,8 +11,9 @@ if (empty($_SESSION['user']) || empty($_SESSION['mfa_verified'])) {
 
 $repo = new PostRepository('db_connect'); // Instantiate PostRepository
 
-$postID = (int)($_POST['post_id'] ?? 0);
-$userID = (int)$_SESSION['user']['id'];
+$postID   = (int)($_POST['post_id'] ?? 0);
+$userID   = (int)$_SESSION['user']['id'];
+$username = (string)($_SESSION['user']['username'] ?? '');
 
 if (!$postID) {
     echo json_encode(['status' => 'error', 'message' => 'Invalid post']);
@@ -26,7 +27,7 @@ if (!$postOwnerID) {
     exit;
 }
 
-$result = $repo->processLike($postID, $userID);
+$result = $repo->processLike($postID, $userID, $username);
 
 echo json_encode([
     'status' => 'success',

@@ -198,6 +198,31 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
                 ><?php echo $label; ?></button>
               <?php endforeach; ?>
             </div>
+
+            <div class="audit-type-radios" role="radiogroup" aria-label="Event type">
+              <?php
+                $auditTypes = [
+                  'all'     => 'All',
+                  'login'   => 'Logins',
+                  'logout'  => 'Logouts',
+                  'like'    => 'Reacts',
+                  'comment' => 'Comments',
+                  'post'    => 'Posts',
+                ];
+                foreach ($auditTypes as $typeVal => $typeLabel):
+              ?>
+                <input
+                  type="radio"
+                  class="audit-type-radio"
+                  name="auditTypeFilter"
+                  id="auditType_<?php echo $typeVal; ?>"
+                  value="<?php echo $typeVal; ?>"
+                  <?php echo $typeVal === 'all' ? 'checked' : ''; ?>
+                  onchange="filterAuditLog()"
+                >
+                <label for="auditType_<?php echo $typeVal; ?>" class="audit-pill audit-type-pill"><?php echo $typeLabel; ?></label>
+              <?php endforeach; ?>
+            </div>
           </div>
 
           <!-- ── Audit result count ── -->
@@ -218,8 +243,9 @@ $commissions = $commissionRepo->getAllCommissions(true, $adminID); // Call Commi
               <?php foreach ($auditLogs as $log):
                 $fullName = trim(($log['first_name'] ?? '') . ' ' . ($log['last_name'] ?? ''));
                 $searchData = strtolower($log['admin_username'] . ' ' . $fullName);
+                $entryType = $log['target_type'] ?? '';
               ?>
-                <div class="audit-entry" data-search="<?php echo htmlspecialchars($searchData); ?>">
+                <div class="audit-entry" data-search="<?php echo htmlspecialchars($searchData); ?>" data-type="<?php echo htmlspecialchars($entryType); ?>">
                   <span class="audit-admin"><?php echo htmlspecialchars($log['admin_username']); ?></span>
                   <?php if ($fullName): ?>
                     <span class="audit-fullname">(<?php echo htmlspecialchars($fullName); ?>)</span>
@@ -771,6 +797,8 @@ function filterCommissions() {
 function filterAuditLog() {
   const input   = document.getElementById('auditSearchInput');
   const text    = input ? input.value.toLowerCase().trim() : '';
+  const typeRadio = document.querySelector('input[name="auditTypeFilter"]:checked');
+  const type    = typeRadio ? typeRadio.value : 'all';
   const entries = document.querySelectorAll('#auditList .audit-entry');
   const empty   = document.getElementById('auditEmpty');
   const counter = document.getElementById('auditResultCount');
@@ -781,7 +809,10 @@ function filterAuditLog() {
   let visible = 0;
   entries.forEach(entry => {
     const data = (entry.getAttribute('data-search') || '').toLowerCase();
-    const show = text === '' || data.includes(text);
+    const entryType = entry.getAttribute('data-type') || '';
+    const matchesText = text === '' || data.includes(text);
+    const matchesType = type === 'all' || entryType === type;
+    const show = matchesText && matchesType;
     entry.style.display = show ? '' : 'none';
     if (show) visible++;
   });
@@ -789,13 +820,13 @@ function filterAuditLog() {
   if (empty) empty.style.display = visible === 0 ? '' : 'none';
   if (counter) {
     const total = entries.length;
-    if (text === '') {
+    if (text === '' && type === 'all') {
       counter.textContent = total === 0
         ? 'No entries found.'
         : `${total} ${total === 1 ? 'entry' : 'entries'} · shown`;
     } else {
       counter.textContent = visible === 0
-        ? 'No entries match your search.'
+        ? 'No entries match your filters.'
         : `${visible} of ${total} ${total === 1 ? 'entry' : 'entries'} match`;
     }
   }

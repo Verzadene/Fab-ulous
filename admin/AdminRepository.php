@@ -439,7 +439,7 @@ class AdminRepository
         $connAudit = $this->getConnection('audit_log');
         $dbAccounts = DB_CONFIG['accounts']['name'];
 
-        $sql = "SELECT al.logID, al.admin_id, al.admin_username, al.action, al.created_at,
+        $sql = "SELECT al.logID, al.admin_id, al.admin_username, al.action, al.target_type, al.created_at,
                        a.first_name, a.last_name
                 FROM audit_log al
                 JOIN `{$dbAccounts}`.accounts a ON al.admin_id = a.id

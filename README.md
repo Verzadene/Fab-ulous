@@ -27,6 +27,7 @@ Community platform for sharing software and hardware projects in one space. The 
 | PayMongo payment checkout | ✅ Complete | `post/paymongo_checkout.php`, `post/paymongo_webhook.php` |
 | Profile management | ✅ Complete | `profile/profile.php` |
 | Admin dashboard (users, posts, commissions, audit log) | ✅ Complete | `admin/admin.php`, `admin/commission_update.php` |
+| Live Audit — activity feed for logins, logouts, posts, reacts, comments, with search + event-type filter | ✅ Complete | `admin/admin.php`, `admin/AdminRepository.php`, `post/PostRepository.php` |
 
 ---
 
@@ -261,6 +262,31 @@ Every PHP file does `require_once __DIR__ . '/../config.php'` (or equivalent). `
   - Deletion reason is sent to user via SMTP before account removal
   - Email send failures do not prevent deletion but are logged in the audit trail
   - Action is logged with full details: admin username, target user, reason summary
+
+---
+
+### Live Audit Log
+- **Location:** Admin Dashboard > Dashboard tab, "Live Audit" card
+- **What it shows:** A rolling activity feed pulled from the `audit_log` table (`fab_ulous_audit_log` database) — logins, logouts, new posts, likes/unlikes, new comments, and admin actions (bans, unbans, promotions, demotions, deletions, commission updates, post removals).
+- **Time window:** Pills for 8 hrs / 24 hrs / 3 days / 7 days / 30 days. Selecting one reloads the page with `?audit_hours=...` and re-queries `AdminRepository::searchAuditLogs()`.
+- **Search:** A text input filters the currently-loaded entries client-side by admin username or full name (no reload).
+- **Event-type filter:** A row of radio buttons — **All / Logins / Logouts / Reacts / Comments / Posts** — filters the same loaded entries client-side by the log row's `target_type` (rendered as a `data-type` attribute per entry). Search and event-type filters combine (both must match).
+- **Visibility:** Regular admins see `visibility_role = 'admin'` entries only; super admins see everything, including `visibility_role = 'super_admin'` entries (e.g. promotions, demotions, account deletions).
+- **What gets logged where:**
+
+  | Event | Logged from | `target_type` |
+  |---|---|---|
+  | Login (password) | `login/verify_mfa.php` | `login` |
+  | Login (Google OAuth) | `oauth/oauth2callback.php` | `login` |
+  | Logout | `login/logout.php`, `admin/admin_logout.php` | `logout` |
+  | New post | `PostRepository::processCreatePost()` | `post` |
+  | Post deleted (by owner) / removed (by admin) | `PostRepository::processDeletePost()`, `AdminRepository::processDeletePost()` | `post` |
+  | Like / unlike | `PostRepository::processLike()` | `like` |
+  | New comment | `PostRepository::addComment()` | `comment` |
+  | Comment deleted (by owner) | `PostRepository::deleteComment()` | `comment` |
+  | Ban / unban / promote / demote / delete account | `AdminRepository` | `account` |
+  | Commission status update | `CommissionRepository::logAuditAction()` | `commission` |
+- **Implementation notes:** Post/like/comment logging happens inside `PostRepository` (repository-owned, per the Repository Pattern), and only fires when the calling controller passes a non-empty username — `post/create_post.php`, `post/like.php`, and `post/comment.php` all pass `$_SESSION['user']['username']`. Extending the filter to a new event type means calling `logAuditAction()` with a new, distinct `target_type` and adding a matching option to the `$auditTypes` array in `admin/admin.php`.
 
 ---
 
