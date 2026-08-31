@@ -229,7 +229,7 @@ Each commission can have one admin/super_admin assigned as the "Assigned Positio
 3. **Visibility of the assignment is role-gated per viewer, per commission:**
    - **Super Admin:** always sees who is assigned (or "Unassigned") and gets the reassignment dropdown, for every commission.
    - **The assigned admin:** sees a read-only "Assigned to you" badge for commissions assigned to them.
-   - **Any other regular admin ("non-assigned admin"):** cannot see who a commission is assigned to — sees a "🔒 Restricted" placeholder instead. They can still see whether a commission is unassigned (not considered sensitive).
+   - **Any other regular admin ("non-assigned admin"):** cannot see who a commission is assigned to — sees a "Restricted" placeholder instead (no lock emoji). They can still see whether a commission is unassigned (not considered sensitive).
    - **The requesting user** (on `post/commissions.php`): always sees the assigned admin's name and contact email once one is assigned, so they know who to reach — this is the one case where the assignee's identity is intentionally exposed outside the admin/super_admin roles.
 4. **Target validation:** the assignee must currently be an active (`banned = 0`) `admin` or `super_admin` account; `processAssignCommission()` checks the candidate against `getAdminRoster()` before writing.
 

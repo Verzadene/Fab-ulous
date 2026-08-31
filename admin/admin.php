@@ -566,7 +566,7 @@ $adminRoster = $isSuperAdmin ? $commissionRepo->getAdminRoster() : [];
                     <?php elseif ($isAssignedToMe): ?>
                       <span class="status-badge status-accepted" title="This commission is assigned to you.">Assigned to you</span>
                     <?php elseif ($assignedAdminId > 0): ?>
-                      <span class="no-action" title="Assignment details are only visible to the assigned admin and Super Admins.">&#128274; Restricted</span>
+                      <span class="no-action" title="Assignment details are only visible to the assigned admin and Super Admins.">Restricted</span>
                     <?php else: ?>
                       <span class="no-action">Unassigned</span>
                     <?php endif; ?>
