@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `commission_payments` (
   `paymentID` int(11) NOT NULL AUTO_INCREMENT,
   `commissionID` int(11) NOT NULL,
   `paymongo_payment_id` varchar(255) NOT NULL,
-  `status` varchar(50) NOT NULL,
+  `status` varchar(50) NOT NULL DEFAULT 'ongoing', -- lifecycle: 'ongoing' -> 'paid' | 'failed'
   `amount` decimal(10,2) NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `paid_at` datetime DEFAULT NULL,
@@ -286,3 +286,16 @@ DEALLOCATE PREPARE idx_stmt;
 
 -- Backfill: existing rows default to NULL (unassigned) automatically via the
 -- column DEFAULT, so no UPDATE is needed.
+
+-- ── Migration: commission_payments.status renamed in-flight value ────────
+-- 'pending' (pre-existing rows created before this change) is renamed to
+-- 'ongoing' to match the current lifecycle used by PaymentRepository:
+-- 'ongoing' -> 'paid' | 'failed'. 'paid'/'failed'/'cancelled' rows are
+-- untouched. Safe to re-run: a second run finds 0 'pending' rows and is a
+-- no-op.
+USE `fab_ulous_commission_payments`;
+
+ALTER TABLE `commission_payments`
+    MODIFY COLUMN `status` VARCHAR(50) NOT NULL DEFAULT 'ongoing';
+
+UPDATE `commission_payments` SET `status` = 'ongoing' WHERE `status` = 'pending';

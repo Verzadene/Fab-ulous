@@ -19,6 +19,13 @@
  *        (pay_…), sets status='paid' and paid_at, then fires the notification.
  *   The schema has no column for the PayMongo reference number or checkout url,
  *   so updatePaymentWithCheckoutDetails accepts but does not persist them.
+ *
+ * Payment status lifecycle (commission_payments.status):
+ *   'ongoing' -> 'paid'   (webhook confirms the PayMongo payment)
+ *   'ongoing' -> 'failed' (checkout creation fails, or superseded by a
+ *                          fresh Pay click, or a duplicate-paid guard trips)
+ *   A row is created as 'ongoing' the moment the user clicks Pay and only
+ *   ever leaves that state once, to 'paid' or 'failed' — never reversed.
  */
 class PaymentRepository {
     private $dbConnectFactory;
@@ -102,7 +109,7 @@ class PaymentRepository {
     ): ?int {
         $conn = $this->getConnection('commission_payments');
         $placeholder = 'pending_' . uniqid('', true);
-        $status = 'pending';
+        $status = 'ongoing';
 
         $stmt = $conn->prepare(
             "INSERT INTO commission_payments (commissionID, paymongo_payment_id, status, amount)
@@ -130,7 +137,7 @@ class PaymentRepository {
     }
 
     /**
-     * Marks every still-pending row for a commission as 'failed'. Called
+     * Marks every still-ongoing row for a commission as 'failed'. Called
      * before opening a new checkout so a user who clicks Pay twice cannot
      * end up with two simultaneously-payable PayMongo sessions for the
      * same commission.
@@ -140,7 +147,7 @@ class PaymentRepository {
         $conn = $this->getConnection('commission_payments');
         $stmt = $conn->prepare(
             "UPDATE commission_payments SET status = 'failed'
-             WHERE commissionID = ? AND status = 'pending'"
+             WHERE commissionID = ? AND status = 'ongoing'"
         );
         if (!$stmt) return 0;
         $stmt->bind_param('i', $commissionId);
@@ -239,7 +246,7 @@ class PaymentRepository {
                 if ($alreadyPaid) {
                     $failStmt = $conn->prepare(
                         "UPDATE commission_payments SET status = 'failed'
-                         WHERE paymentID = ? AND status = 'pending'"
+                         WHERE paymentID = ? AND status = 'ongoing'"
                     );
                     if ($failStmt) {
                         $failStmt->bind_param('i', $paymentId);
@@ -251,12 +258,12 @@ class PaymentRepository {
             }
         }
 
-        // Only promote 'pending' rows. 'failed' / 'cancelled' rows must not
+        // Only promote 'ongoing' rows. 'failed' / 'cancelled' rows must not
         // become 'paid' through a stale webhook delivery.
         $stmt = $conn->prepare(
             "UPDATE commission_payments
              SET status = 'paid', paymongo_payment_id = ?, paid_at = NOW()
-             WHERE paymentID = ? AND status = 'pending'"
+             WHERE paymentID = ? AND status = 'ongoing'"
         );
         if (!$stmt) return 0;
         $stmt->bind_param('si', $actualPaymentId, $paymentId);

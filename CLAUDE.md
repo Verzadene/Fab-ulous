@@ -282,6 +282,12 @@ Each commission can have one admin/super_admin assigned as the "Assigned Positio
 
 ---
 
+### 15. Payment Status Lifecycle & Portable App Base URL
+
+**Payment status (`commission_payments.status`):** lifecycle is `'ongoing'` → `'paid'` (webhook confirms) or `'failed'` (checkout fails / superseded by a new Pay click / duplicate-paid guard). `createPendingPaymentRecord()` inserts rows as `'ongoing'`; `processWebhookPayment()` only promotes `'ongoing'` rows to `'paid'`. Older installs upgrade via the idempotent backfill in `database/fab_ulous_setup_micro_dbs.sql` (`status = 'pending'` → `'ongoing'`).
+
+**Portable base URL:** `APP_URL` and `GOOGLE_REDIRECT_URI` are no longer hardcoded to `http://localhost/Fab-ulous`. `config.php`'s `fabulous_detect_base_url()` derives scheme + host + folder from the current request (diffing `__DIR__` against `$_SERVER['DOCUMENT_ROOT']`), so the app works under `htdocs` on any machine/folder name without edits, given the same `config.local.php` API keys. `config.local.php` no longer defines `APP_URL`/`GOOGLE_REDIRECT_URI`; set an env var or uncomment the `define()` there only to force a fixed value (e.g. an HTTPS tunnel for OAuth testing).
+
 ## Verification Checklist
 1. Run `php -l` on every edited PHP file.
 2. Re-test the affected route in the browser after each auth or upload change.
